@@ -34,15 +34,23 @@ so. `--no-ast-grep` skips the pattern rules.
 cargo bs              # check the current directory
 cargo bs --fix        # fix what can be fixed, report the rest
 cargo bs src tests    # check some paths
-cargo bs init         # write clippy.toml + rustfmt.toml, print the lints table
+cargo bs -- -odd.rs   # everything after `--` is a path
+cargo bs init [DIR]   # write clippy.toml + rustfmt.toml into DIR (default .), print the lints table
+cargo bs --version    # or -V
 ```
+
+`init` takes only `-h`/`--help` and one directory, so `cargo bs init --help` prints its usage
+and writes nothing.
 
 Inside a git checkout it reads exactly what git lists: tracked files plus untracked files that
 aren't ignored. The pattern rules get that same list, file by file, with ast-grep's own ignore
 files and any project `sgconfig.yml` switched off, so neither can hide a file. A path with no
 such files (say, a gitignored directory) is reported, and so is a file `syn` can't parse: no
 rule could check it, so it doesn't pass. The exit code is 0 when clean, 1 on findings, 2 on a
-usage error or when ast-grep is missing. Run `cargo fmt` before `cargo bs --fix`:
+usage error, a `bs.toml` entry that names nothing, or when ast-grep is missing. `--fix` applies
+its fixes pass after pass until none is left; if they still haven't settled after 8 passes (two
+fixes undoing each other, which is a bug in `cargo bs`), it leaves that file as it was and says
+so. Run `cargo fmt` before `cargo bs --fix`:
 formatting moves line breaks, and the padding rules judge the result. rustfmt keeps any blank lines
 it finds, so the two never fight.
 
