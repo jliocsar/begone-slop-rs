@@ -12,7 +12,7 @@ use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{File, ItemFn, ItemMod, ItemUse, Macro};
 
-use super::paths::{UseLeaf, segments, starts_with, use_leaves};
+use super::paths::{UseLeaf, file_imports, segments, starts_with, use_leaves};
 use super::test_scope::{is_test_fn, is_test_module, is_test_path};
 use super::{Finding, Rule};
 use crate::config::{Config, IoBoundary};
@@ -170,18 +170,6 @@ fn is_allowed(config: &Config, boundary: &IoBoundary, path: &Path) -> bool {
             .iter()
             .any(|allowed| relative.starts_with(allowed))
     })
-}
-
-fn file_imports(file: &File) -> HashMap<String, Vec<String>> {
-    file.items
-        .iter()
-        .filter_map(|item| match item {
-            syn::Item::Use(import) => Some(use_leaves(&import.tree)),
-            _ => None,
-        })
-        .flatten()
-        .filter_map(|leaf| Some((leaf.local?, leaf.full)))
-        .collect()
 }
 
 pub(super) fn check(source: &Source, file: &File, config: &Config) -> Vec<Finding> {

@@ -3,11 +3,16 @@
 mod abbreviations;
 mod accumulator;
 mod assert_padding;
+mod async_blocking;
+mod comments;
 mod complexity;
+mod exhaustive;
 mod gap;
 mod io_boundary;
 mod layers;
 mod lint_waivers;
+mod modules;
+mod names;
 mod padding;
 mod paths;
 mod prefer_match;
@@ -28,13 +33,21 @@ pub enum Rule {
     Complexity,
     IoBoundary,
     Layers,
+    ModuleDoc,
     NewtypeIds,
     NoAbbreviations,
+    NoBlockingInAsync,
     NoBooleanTrap,
+    NoCommentedOutCode,
     NoCrateLevelAllow,
     NoForbiddenExpects,
+    NoJunkDrawerModules,
     NoMutableAccumulator,
+    NoNumberedNames,
     NoSleepInTests,
+    NoStringlyFields,
+    NoTypeInName,
+    NoWildcardOnLocalEnum,
     Padding,
     PreferMatch,
     ReexportOnly,
@@ -51,13 +64,21 @@ impl Rule {
             Self::Complexity => "complexity",
             Self::IoBoundary => "io-boundary",
             Self::Layers => "layers",
+            Self::ModuleDoc => "module-doc",
             Self::NewtypeIds => "newtype-ids",
             Self::NoAbbreviations => "no-abbreviations",
+            Self::NoBlockingInAsync => "no-blocking-in-async",
             Self::NoBooleanTrap => "no-boolean-trap",
+            Self::NoCommentedOutCode => "no-commented-out-code",
             Self::NoCrateLevelAllow => "no-crate-level-allow",
             Self::NoForbiddenExpects => "no-forbidden-expects",
+            Self::NoJunkDrawerModules => "no-junk-drawer-modules",
             Self::NoMutableAccumulator => "no-mutable-accumulator",
+            Self::NoNumberedNames => "no-numbered-names",
             Self::NoSleepInTests => "no-sleep-in-tests",
+            Self::NoStringlyFields => "no-stringly-fields",
+            Self::NoTypeInName => "no-type-in-name",
+            Self::NoWildcardOnLocalEnum => "no-wildcard-on-local-enum",
             Self::Padding => "padding",
             Self::PreferMatch => "prefer-match",
             Self::ReexportOnly => "reexport-only-module",
@@ -93,6 +114,11 @@ pub fn run(source: &Source, file: &syn::File, config: &Config) -> Vec<Finding> {
     findings.extend(signatures::check(source, file));
     findings.extend(io_boundary::check(source, file, config));
     findings.extend(layers::check(source, file, config));
+    findings.extend(names::check(file));
+    findings.extend(modules::check(source, file));
+    findings.extend(comments::check(source));
+    findings.extend(exhaustive::check(file));
+    findings.extend(async_blocking::check(file));
     findings.retain(|finding| !source.waives(finding.line, finding.rule.name()));
     findings.sort_by_key(|finding| finding.line);
 

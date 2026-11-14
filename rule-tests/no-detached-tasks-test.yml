@@ -1,0 +1,9 @@
+id: no-detached-tasks
+valid:
+  - 'async fn run() { let handle = tokio::spawn(work()); handle.await; }'
+  - 'async fn run() { tokio::spawn(work()).await; }'
+  - 'fn run(tasks: &mut JoinSet<()>) { tasks.spawn(work()); }'
+invalid:
+  - 'async fn run() { tokio::spawn(work()); }'
+  - 'fn run() { std::thread::spawn(work); }'
+  - 'async fn run() { let _ = tokio::task::spawn_blocking(work); }'

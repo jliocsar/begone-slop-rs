@@ -49,6 +49,10 @@ mod tests {
     fn a_crate_root_may_re_export() {
         let found = findings("src/lib.rs", "pub use crate::circle::Circle;\n");
 
-        assert!(found.is_empty());
+        assert!(
+            found
+                .iter()
+                .all(|finding| finding.rule != Rule::ReexportOnly)
+        );
     }
 }

@@ -1,6 +1,8 @@
 //! Paths as segment lists: what a `use` brings in, and what a path in code names.
 
-use syn::{Path, UseTree};
+use std::collections::HashMap;
+
+use syn::{File, Item, Path, UseTree};
 
 /// One leaf of a `use` tree: the name it binds here (none for a glob) and the full path.
 pub(super) struct UseLeaf {
@@ -29,6 +31,19 @@ pub(super) fn starts_with(full: &[String], prefix: &str) -> bool {
     let wanted: Vec<&str> = prefix.split("::").collect();
 
     full.len() >= wanted.len() && full.iter().zip(&wanted).all(|(have, want)| have == want)
+}
+
+/// What each name imported at the top of the file stands for: `fs` → `std::fs`.
+pub(super) fn file_imports(file: &File) -> HashMap<String, Vec<String>> {
+    file.items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Use(import) => Some(use_leaves(&import.tree)),
+            _ => None,
+        })
+        .flatten()
+        .filter_map(|leaf| Some((leaf.local?, leaf.full)))
+        .collect()
 }
 
 fn collect(tree: &UseTree, prefix: &[String], leaves: &mut Vec<UseLeaf>) {

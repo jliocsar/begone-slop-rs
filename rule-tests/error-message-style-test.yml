@@ -1,0 +1,7 @@
+id: error-message-style
+valid:
+  - "enum Error {\n    #[error(\"failed to read {path}\")]\n    Read { path: String },\n}"
+  - "enum Error {\n    #[error(\"IO error on {0}\")]\n    Io(String),\n}"
+invalid:
+  - "enum Error {\n    #[error(\"Failed to read {path}\")]\n    Read { path: String },\n}"
+  - "enum Error {\n    #[error(\"failed to read {path}.\")]\n    Read { path: String },\n}"

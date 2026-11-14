@@ -1,4 +1,5 @@
-//! `no-boolean-trap` and `newtype-ids`: signatures that say what their values mean.
+//! `no-boolean-trap`, `newtype-ids` and `no-stringly-fields`: signatures that say what their
+//! values mean.
 //!
 //! `draw(true)` says nothing at the call site; `draw(Fill::Solid)` does. And an id typed as a
 //! `String` or a number takes any other id of the same type without complaint; a newtype per
@@ -22,6 +23,15 @@ const RAW_ID_TYPES: [&str; 17] = [
 ];
 
 const ID_COLLECTIONS: [&str; 4] = ["Vec", "HashSet", "BTreeSet", "Option"];
+
+/// Names that hold one of a fixed set of values, which is what an enum is for.
+const CATEGORY_NAMES: [&str; 12] = [
+    "category", "kind", "level", "mode", "phase", "priority", "role", "severity", "stage", "state",
+    "status", "variant",
+];
+
+const STRING_TYPES: [&str; 2] = ["String", "str"];
+const PARSE_PREFIXES: [&str; 2] = ["from_", "parse"];
 
 struct Signatures {
     findings: Vec<Finding>,
@@ -60,9 +70,30 @@ impl Signatures {
                 );
             }
 
+            let parses = PARSE_PREFIXES
+                .iter()
+                .any(|prefix| signature.ident.to_string().starts_with(prefix));
+
+            if !parses {
+                self.category(&name, &typed.ty, binding.ident.span().start().line);
+            }
+
             if !self.in_id_impl {
                 self.id(&name, &typed.ty, binding.ident.span().start().line);
             }
+        }
+    }
+
+    fn category(&mut self, name: &str, ty: &Type, line: usize) {
+        let last_word = name.rsplit('_').next().unwrap_or(name);
+        let stringly = CATEGORY_NAMES.contains(&last_word) && is_string(ty);
+
+        if stringly {
+            self.push(
+                line,
+                Rule::NoStringlyFields,
+                format!("`{name}` holds one of a fixed set of values as a string; make it an enum and parse it once, at the boundary"),
+            );
         }
     }
 
@@ -96,6 +127,7 @@ impl<'ast> Visit<'ast> for Signatures {
             && !self.skipped()
         {
             self.id(&ident.to_string(), &field.ty, ident.span().start().line);
+            self.category(&ident.to_string(), &field.ty, ident.span().start().line);
         }
 
         visit::visit_field(self, field);
@@ -140,6 +172,20 @@ impl<'ast> Visit<'ast> for Signatures {
 fn is_plain(ty: &Type, name: &str) -> bool {
     matches!(ty, Type::Path(path) if path.qself.is_none()
         && path.path.segments.last().is_some_and(|segment| segment.ident == name && segment.arguments.is_empty()))
+}
+
+/// `String`, `&str`, `Box<str>`, `Arc<str>`, `Cow<str>`.
+fn is_string(ty: &Type) -> bool {
+    match ty {
+        Type::Reference(reference) => is_string(&reference.elem),
+        Type::Path(path) => path.path.segments.last().is_some_and(|segment| {
+            let wraps_str = matches!(&segment.arguments, PathArguments::AngleBracketed(arguments)
+                if arguments.args.iter().any(|argument| matches!(argument, GenericArgument::Type(inner) if is_plain(inner, "str"))));
+
+            STRING_TYPES.iter().any(|name| segment.ident == name) || wraps_str
+        }),
+        _ => false,
+    }
 }
 
 /// `String`, `&str`, an integer, `Uuid`, `Box<str>`, `Arc<str>`.
@@ -201,6 +247,13 @@ pub(super) fn check(source: &Source, file: &syn::File) -> Vec<Finding> {
 mod tests {
     use crate::rules::Rule;
     use crate::rules::testing::{NONE, lines_of};
+
+    #[test]
+    fn a_stringly_category_is_reported() {
+        let text = "struct Job {\n    status: String,\n    log_level: &'static str,\n    name: String,\n}\n\nfn parse_mode(mode: &str) -> Mode {\n    lookup(mode)\n}\n";
+
+        assert_eq!(lines_of(Rule::NoStringlyFields, text), [2, 3]);
+    }
 
     #[test]
     fn a_bool_parameter_is_reported() {

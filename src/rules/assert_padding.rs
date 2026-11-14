@@ -130,7 +130,11 @@ mod tests {
     fn a_tests_directory_counts_as_tests() {
         let text = "fn helper() {\n    let sum = 1 + 1;\n    assert_eq!(sum, 2);\n}\n";
         let found = findings("tests/sample.rs", text);
+        let padding = found
+            .iter()
+            .filter(|finding| finding.rule == Rule::AssertPadding)
+            .count();
 
-        assert_eq!(found.len(), 1);
+        assert_eq!(padding, 1);
     }
 }

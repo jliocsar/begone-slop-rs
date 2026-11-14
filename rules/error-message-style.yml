@@ -1,0 +1,12 @@
+id: error-message-style
+language: Rust
+severity: error
+message: An error message is lowercase with no trailing period, so a chain of causes reads as one line.
+note: |
+  Rust's API guidelines (C-GOOD-ERR): `failed to read config: permission denied`, not
+  `Failed to read config.: Permission denied.`. Acronyms like `IO` or `HTTP` may lead.
+rule:
+  kind: attribute_item
+  any:
+    - regex: '^#\[\s*error\s*\(\s*"[A-Z][a-z]'
+    - regex: '^#\[\s*error\s*\(\s*"[^"]*\.\s*"'

@@ -1,0 +1,27 @@
+id: no-detached-tasks
+language: Rust
+severity: error
+message: A spawned task whose handle is dropped fails silently. Keep the handle and join it, or own the task in a JoinSet.
+note: |
+  When a detached task panics or returns an error, nobody hears about it, and nothing waits for
+  it at shutdown. Await the `JoinHandle`, store it and abort it on drop, or spawn into a
+  `JoinSet` that something drains.
+rule:
+  any:
+    - kind: expression_statement
+      has:
+        kind: call_expression
+        has:
+          field: function
+          regex: '^((std::)?thread::|(tokio::)?task::|tokio::)?spawn(_local|_blocking)?$'
+    - kind: let_declaration
+      all:
+        - has:
+            field: pattern
+            regex: '^_$'
+        - has:
+            field: value
+            kind: call_expression
+            has:
+              field: function
+              regex: '^((std::)?thread::|(tokio::)?task::|tokio::)?spawn(_local|_blocking)?$'

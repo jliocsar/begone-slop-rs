@@ -147,7 +147,7 @@ impl<'ast> Visit<'ast> for Abbreviations {
 }
 
 /// `parse_cfg_file` and `ParseCfgFile` both give `parse`, `cfg`, `file`.
-fn words(name: &str) -> Vec<String> {
+pub(super) fn words(name: &str) -> Vec<String> {
     let mut found: Vec<String> = Vec::new();
     let mut previous_lower = false;
 
