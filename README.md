@@ -124,10 +124,20 @@ order = ["crate::conn", "crate::proto"]
   system, network, processes, environment, stdio (`print!` and friends included), clock,
   randomness or signals. It's checked where an effect is imported, and where a full path names it
   in code, macro arguments (`format!`, `dbg!`) included. Values that only live under those modules
-  (`SocketAddr`, `IpAddr`, `ExitCode`, `std::env::consts`, `fs::Metadata`) aren't effects. Test
-  code is exempt.
+  (`SocketAddr`, `IpAddr`, `ExitCode`, `std::env::consts`, `fs::Metadata`) aren't effects. `Path`'s
+  own file-system methods are: `.exists()`, `.try_exists()`, `.canonicalize()`, `.metadata()`,
+  `.symlink_metadata()`, `.read_dir()`, `.read_link()`, `.is_file()`, `.is_dir()` and
+  `.is_symlink()`. The receiver's type isn't known, so any call by those names counts, except
+  `.is_file()`/`.is_dir()`/`.is_symlink()` on what `metadata()` or `file_type()` just returned or
+  on a binding named for it (`kind`, `file_type`, `meta`). Test code is exempt.
 - `layers`: each `use`, and each path written from `crate`/`self`/`super`, points down the
   declared order. Between crates, Cargo's dependency graph already does this.
+
+A typo in `bs.toml` would switch a boundary off without a word, so `cargo bs` checks every entry
+when it loads the file and exits 2 naming the first bad one: each `allowed` path has to exist,
+each `effects` entry has to be a path (`sqlx`, `tokio::fs`), each `crate` has to be a directory
+with a `Cargo.toml`, and each `order` entry has to be a `crate::` path to a module of that crate
+(a `src/` file or directory, or an inline `mod` in its parent's file).
 
 This repo's own [`bs.toml`](bs.toml) keeps `src/rules/` pure and layered below `check`.
 

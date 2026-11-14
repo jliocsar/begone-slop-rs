@@ -32,13 +32,8 @@ impl LayerCheck<'_> {
             .order
             .iter()
             .enumerate()
-            .filter(|(_, layer)| {
-                let wanted: Vec<&str> = layer.split("::").collect();
-
-                path.len() >= wanted.len()
-                    && path.iter().zip(&wanted).all(|(have, want)| have == want)
-            })
-            .max_by_key(|(_, layer)| layer.len())
+            .filter(|(_, layer)| path.starts_with(layer.segments()))
+            .max_by_key(|(_, layer)| layer.segments().len())
             .map(|(index, _)| index)
     }
 
@@ -83,7 +78,13 @@ impl LayerCheck<'_> {
         if let (Some(here), Some(there)) = (here, there)
             && there < here
         {
-            let order = self.layers.order.join(" → ");
+            let order = self
+                .layers
+                .order
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(" → ");
 
             self.findings.push(Finding {
                 line,
@@ -176,13 +177,15 @@ mod tests {
     use std::path::Path;
 
     use super::{LayerCheck, module_path};
-    use crate::config::Layers;
+    use crate::config::{Layers, ModulePath};
     use crate::rules::test_scope::TestLines;
 
     fn violations(module: &str, text: &str) -> Vec<usize> {
         let layers = Layers {
             crate_root: ".".into(),
-            order: vec!["crate::conn".to_owned(), "crate::proto".to_owned()],
+            order: ["crate::conn", "crate::proto"]
+                .map(|written| ModulePath::try_from(written.to_owned()).unwrap())
+                .to_vec(),
         };
         let tests = TestLines::default();
         let mut layer_check = LayerCheck {
