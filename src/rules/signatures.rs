@@ -5,11 +5,14 @@
 //! `String` or a number takes any other id of the same type without complaint; a newtype per
 //! kind of id makes swapping two of them a compile error. Methods in trait impls keep the
 //! trait's signature, test code is left alone, and an id newtype's own impl may take the raw
-//! value it wraps.
+//! value it wraps. A type alias in the same file (`type Flag = bool;`) is read as what it
+//! names, so renaming the type doesn't hide it.
+
+use std::collections::HashMap;
 
 use syn::visit::{self, Visit};
 use syn::{
-    Field, FnArg, GenericArgument, ImplItemFn, ItemFn, ItemImpl, ItemMod, Pat, PathArguments,
+    Field, FnArg, GenericArgument, ImplItemFn, Item, ItemFn, ItemImpl, ItemMod, Pat, PathArguments,
     Signature, TraitItemFn, Type,
 };
 
@@ -32,7 +35,16 @@ const CATEGORY_NAMES: [&str; 12] = [
 const STRING_TYPES: [&str; 2] = ["String", "str"];
 const PARSE_PREFIXES: [&str; 2] = ["from_", "parse"];
 
-struct Signatures {
+/// How many aliases deep a chain is followed; rustc rejects a cycle, but a file may not compile.
+const MAX_ALIAS_HOPS: usize = 8;
+
+/// The file's `type X = ...;` aliases without generics, by name.
+struct Aliases<'file> {
+    by_name: HashMap<String, &'file Type>,
+}
+
+struct Signatures<'file> {
+    aliases: Aliases<'file>,
     findings: Vec<Finding>,
     test_file: bool,
     test_depth: usize,
@@ -40,7 +52,47 @@ struct Signatures {
     in_id_impl: bool,
 }
 
-impl Signatures {
+impl<'file> Aliases<'file> {
+    fn of(items: &'file [Item]) -> HashMap<String, &'file Type> {
+        items
+            .iter()
+            .flat_map(|item| match item {
+                Item::Type(alias) if alias.generics.params.is_empty() => {
+                    HashMap::from([(alias.ident.to_string(), &*alias.ty)])
+                }
+                Item::Mod(module) => module
+                    .content
+                    .as_ref()
+                    .map(|(_, items)| Self::of(items))
+                    .unwrap_or_default(),
+                _ => HashMap::new(),
+            })
+            .collect()
+    }
+
+    /// What `ty` names when it's an alias, followed to the end of the chain.
+    fn target(&self, ty: &Type) -> Option<&'file Type> {
+        let mut found = None;
+        let mut current_name = alias_name(ty)?;
+
+        for _ in 0..MAX_ALIAS_HOPS {
+            let Some(target) = self.by_name.get(&current_name) else {
+                return found;
+            };
+
+            found = Some(*target);
+
+            match alias_name(target) {
+                Some(next) => current_name = next,
+                None => return found,
+            }
+        }
+
+        None
+    }
+}
+
+impl Signatures<'_> {
     fn skipped(&self) -> bool {
         self.test_file || self.test_depth > 0
     }
@@ -61,7 +113,7 @@ impl Signatures {
 
             let name = binding.ident.to_string();
 
-            if is_plain(&typed.ty, "bool") {
+            if is_plain(&typed.ty, "bool", &self.aliases) {
                 self.push(
                     binding.ident.span().start().line,
                     Rule::NoBooleanTrap,
@@ -85,7 +137,7 @@ impl Signatures {
 
     fn category(&mut self, name: &str, ty: &Type, line: usize) {
         let last_word = name.rsplit('_').next().unwrap_or(name);
-        let stringly = CATEGORY_NAMES.contains(&last_word) && is_string(ty);
+        let stringly = CATEGORY_NAMES.contains(&last_word) && is_string(ty, &self.aliases);
 
         if stringly {
             self.push(
@@ -99,7 +151,9 @@ impl Signatures {
     fn id(&mut self, name: &str, ty: &Type, line: usize) {
         let single = name == "id" || name.ends_with("_id");
         let plural = name == "ids" || name.ends_with("_ids");
-        let raw = (single && is_raw_id(ty)) || (plural && collected(ty).is_some_and(is_raw_id));
+        let aliases = &self.aliases;
+        let raw = (single && is_raw_id(ty, aliases))
+            || (plural && collected(ty, aliases).is_some_and(|inner| is_raw_id(inner, aliases)));
 
         if raw {
             self.push(
@@ -120,7 +174,7 @@ impl Signatures {
     }
 }
 
-impl<'ast> Visit<'ast> for Signatures {
+impl<'ast> Visit<'ast> for Signatures<'_> {
     fn visit_field(&mut self, field: &'ast Field) {
         if let Some(ident) = &field.ident
             && !self.skipped()
@@ -167,45 +221,74 @@ impl<'ast> Visit<'ast> for Signatures {
     }
 }
 
+/// A single-name path with no generics, which is what an alias is written as.
+fn alias_name(ty: &Type) -> Option<String> {
+    let Type::Path(path) = ty else {
+        return None;
+    };
+
+    let segment = path.path.segments.last()?;
+    let single = path.qself.is_none() && path.path.segments.len() == 1;
+
+    (single && segment.arguments.is_empty()).then(|| segment.ident.to_string())
+}
+
 /// The type's last path segment is `name`, with no generics: `bool`, `String`.
-fn is_plain(ty: &Type, name: &str) -> bool {
+fn is_plain(ty: &Type, name: &str, aliases: &Aliases) -> bool {
+    if let Some(target) = aliases.target(ty) {
+        return is_plain(target, name, aliases);
+    }
+
     matches!(ty, Type::Path(path) if path.qself.is_none()
         && path.path.segments.last().is_some_and(|segment| segment.ident == name && segment.arguments.is_empty()))
 }
 
-/// `String`, `&str`, `Box<str>`, `Arc<str>`, `Cow<str>`.
-fn is_string(ty: &Type) -> bool {
-    match ty {
-        Type::Reference(reference) => is_string(&reference.elem),
-        Type::Path(path) => path.path.segments.last().is_some_and(|segment| {
-            let wraps_str = matches!(&segment.arguments, PathArguments::AngleBracketed(arguments)
-                if arguments.args.iter().any(|argument| matches!(argument, GenericArgument::Type(inner) if is_plain(inner, "str"))));
+/// Whether a generic argument list holds a plain `str`: `Box<str>`, `Cow<'_, str>`.
+fn wraps_str(arguments: &PathArguments, aliases: &Aliases) -> bool {
+    matches!(arguments, PathArguments::AngleBracketed(arguments)
+        if arguments.args.iter().any(|argument| matches!(argument, GenericArgument::Type(inner) if is_plain(inner, "str", aliases))))
+}
 
-            STRING_TYPES.iter().any(|name| segment.ident == name) || wraps_str
+/// `String`, `&str`, `Box<str>`, `Arc<str>`, `Cow<str>`.
+fn is_string(ty: &Type, aliases: &Aliases) -> bool {
+    if let Some(target) = aliases.target(ty) {
+        return is_string(target, aliases);
+    }
+
+    match ty {
+        Type::Reference(reference) => is_string(&reference.elem, aliases),
+        Type::Path(path) => path.path.segments.last().is_some_and(|segment| {
+            STRING_TYPES.iter().any(|name| segment.ident == name)
+                || wraps_str(&segment.arguments, aliases)
         }),
         _ => false,
     }
 }
 
 /// `String`, `&str`, an integer, `Uuid`, `Box<str>`, `Arc<str>`.
-fn is_raw_id(ty: &Type) -> bool {
-    match ty {
-        Type::Reference(reference) => is_raw_id(&reference.elem),
-        Type::Path(path) => path.path.segments.last().is_some_and(|segment| {
-            let wraps_str = matches!(&segment.arguments, PathArguments::AngleBracketed(arguments)
-                if arguments.args.iter().any(|argument| matches!(argument, GenericArgument::Type(inner) if is_plain(inner, "str"))));
+fn is_raw_id(ty: &Type, aliases: &Aliases) -> bool {
+    if let Some(target) = aliases.target(ty) {
+        return is_raw_id(target, aliases);
+    }
 
+    match ty {
+        Type::Reference(reference) => is_raw_id(&reference.elem, aliases),
+        Type::Path(path) => path.path.segments.last().is_some_and(|segment| {
             RAW_ID_TYPES.iter().any(|raw| segment.ident == raw)
-                && (segment.arguments.is_empty() || wraps_str)
+                && (segment.arguments.is_empty() || wraps_str(&segment.arguments, aliases))
         }),
         _ => false,
     }
 }
 
 /// The element type of `Vec<T>`, `HashSet<T>`, `&[T]` and the like.
-fn collected(ty: &Type) -> Option<&Type> {
+fn collected<'ty>(ty: &'ty Type, aliases: &Aliases<'ty>) -> Option<&'ty Type> {
+    if let Some(target) = aliases.target(ty) {
+        return collected(target, aliases);
+    }
+
     match ty {
-        Type::Reference(reference) => collected(&reference.elem),
+        Type::Reference(reference) => collected(&reference.elem, aliases),
         Type::Slice(slice) => Some(&slice.elem),
         Type::Path(path) => {
             let segment = path.path.segments.last()?;
@@ -231,6 +314,9 @@ fn collected(ty: &Type) -> Option<&Type> {
 
 pub(super) fn check(file: &syn::File, context: &Context) -> Vec<Finding> {
     let mut signatures = Signatures {
+        aliases: Aliases {
+            by_name: Aliases::of(&file.items),
+        },
         findings: Vec::new(),
         test_file: context.in_tests(),
         test_depth: 0,
@@ -273,6 +359,15 @@ mod tests {
         let text = "struct Session {\n    session_id: String,\n    owner_ids: Vec<u64>,\n    name: String,\n}\n\nfn find(id: &str) {}\n";
 
         assert_eq!(lines_of(Rule::NewtypeIds, text), [2, 3, 7]);
+    }
+
+    #[test]
+    fn same_file_aliases_are_seen_through() {
+        let text = "type Flag = bool;\ntype Name = String;\ntype Key = Name;\n\nstruct Job {\n    status: Name,\n    job_id: Key,\n}\n\nfn draw(filled: Flag) {}\n";
+
+        assert_eq!(lines_of(Rule::NoStringlyFields, text), [6]);
+        assert_eq!(lines_of(Rule::NewtypeIds, text), [7]);
+        assert_eq!(lines_of(Rule::NoBooleanTrap, text), [10]);
     }
 
     #[test]

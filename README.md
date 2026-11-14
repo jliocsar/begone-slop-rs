@@ -166,14 +166,14 @@ The Effect rules have no Rust counterpart. `no-switch` doesn't port, since `matc
 | `no-abbreviations`     | a declared name with an abbreviation that needs decoding (`ctx`, `cfg`, `idx`, `msg`…) |  —  |
 | `test-name`            | a test named `test_*`, `*_test`, `test2`, `it_works`, `works`, `basic` or `smoke`     |  —  |
 | `no-sleep-in-tests`    | `sleep` in test code (`thread::sleep`, `tokio::time::sleep`, …)                       |  —  |
-| `test-must-assert`     | a `#[test]` with no assertion, no `#[should_panic]`, and no call to a helper that asserts |  —  |
+| `test-must-assert`     | a `#[test]` with no assertion, no `#[should_panic]`, and no call to a helper that asserts; `assert!(true)` and other asserts of constants don't count, `.assert()` and `insta::assert_*!` do |  —  |
 | `no-mutable-accumulator` | `let mut v = Vec::new(); for x in xs { v.push(…) }`: use `.map().collect()`, `.sum()`, `.fold()` |  —  |
-| `prefer-match`         | an `if`/`else if` chain of 3+ tests of one subject against fixed values               |  —  |
+| `prefer-match`         | an `if`/`else if` chain of 3+ tests of one subject against fixed values; against strings outside a parse, it says to parse into an enum (as `no-stringly-match` does) |  —  |
 | `no-boolean-trap`      | a `bool` parameter; take a two-variant enum that names both cases                     |  —  |
 | `no-stringly-fields`   | a `kind`/`status`/`state`/`mode`/`level`/`role`… field or parameter typed as a string (parse fns exempt) |  —  |
 | `no-wildcard-on-local-enum` | `_ =>` or a catch-all binding on an enum this file defines (`Enum::V`, `self::Enum::V`, `Self::V`; not `other::Enum::V`), outside tests |  —  |
 | `no-blocking-in-async` | `std::fs`, `std::net`, `std::thread::sleep`, `std::process::Command`, blocking HTTP inside `async` (macro arguments, trait defaults and in-place closures like `map` included; a closure handed to `spawn_blocking`/`spawn`/`block_in_place` isn't) |  —  |
-| `no-numbered-names`    | `item2` next to `item`, or `point1` next to `point2`                                  |  —  |
+| `no-numbered-names`    | `item2` next to `item`, or `point1` next to `point2`; not `x0`/`x1`, bit widths (`hash64`) or terms like `utf8`, `ipv6`, `sha256`, `base64` |  —  |
 | `no-type-in-name`      | `user_vec`, `name_str`, `lookup_hashmap`: the type already says it                    |  —  |
 | `no-junk-drawer-modules` | modules named `utils`, `helpers`, `common`, `misc`                                  |  —  |
 | `module-doc`           | a file without a `//!` comment saying what it's for (`build.rs` exempt)               |  —  |
@@ -223,6 +223,9 @@ with a comment inside is only reported, since the comment could belong to either
 fields, types, variants and constants. Names used from other crates, and methods in a trait impl,
 are left alone. Words the language itself uses, like `str`, `len`, `args` and `fmt`, aren't on the
 list. Neither are domain words like `expr` or `stmt`.
+
+`no-boolean-trap`, `newtype-ids` and `no-stringly-fields` read a type alias in the same file as
+what it names: `type Flag = bool;` doesn't hide a `bool` parameter.
 
 Waive a finding with a plain `//` comment on its line or the line above. The reason is required,
 and it's a sentence of 3 words or more (`fine` doesn't count). The gate rules above can't be

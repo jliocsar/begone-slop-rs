@@ -2,16 +2,20 @@
 //! prove it, and don't race the clock.
 //!
 //! A test asserts when its body has an assertion macro (`assert*!`, `debug_assert*!`,
-//! `prop_assert*!`, `panic!`, `unreachable!`), is `#[should_panic]`, or calls a function in the
-//! same file that asserts. Running code without checking its result proves only that it
-//! didn't panic.
+//! `prop_assert*!`, `insta::assert_*!`, `panic!`, `unreachable!`) or an assertion method
+//! (`.assert()`, as `assert_cmd` has it), is `#[should_panic]`, or calls a function in the
+//! same file that asserts. An assertion of constants (`assert!(true)`, `assert_eq!(1, 1)`)
+//! checks nothing, so it doesn't count. Running code without checking its result proves only
+//! that it didn't panic.
 
 use std::collections::{HashMap, HashSet};
 
+use quote::ToTokens;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{Block, Expr, ExprCall, ExprMethodCall, File, ImplItemFn, ItemFn, ItemMod, Macro};
+use syn::{Block, Expr, ExprCall, ExprMethodCall, File, ImplItemFn, ItemFn, ItemMod, Macro, UnOp};
 
+use super::paths::macro_arguments;
 use super::test_scope::{is_test_fn, is_test_module};
 use super::{Context, Finding, Rule};
 
@@ -108,7 +112,9 @@ impl<'ast> Visit<'ast> for Body {
     }
 
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
-        self.calls.insert(call.method.to_string());
+        let method = call.method.to_string();
+        self.asserts |= method.starts_with("assert");
+        self.calls.insert(method);
         visit::visit_expr_method_call(self, call);
     }
 
@@ -119,11 +125,12 @@ impl<'ast> Visit<'ast> for Body {
             .last()
             .map(|segment| segment.ident.to_string())
             .unwrap_or_default();
+        let asserting = ASSERTING_PREFIXES
+            .iter()
+            .any(|prefix| name.starts_with(prefix));
 
         self.asserts |= PANICKING_MACROS.contains(&name.as_str())
-            || ASSERTING_PREFIXES
-                .iter()
-                .any(|prefix| name.starts_with(prefix));
+            || (asserting && !asserts_constants(&name, invocation));
     }
 }
 
@@ -209,6 +216,36 @@ impl<'ast> Visit<'ast> for TestHygiene {
     }
 }
 
+/// `assert!(true)`, `assert!(1 == 1)`, `assert_eq!(2, 2)`, `assert_eq!(x, x)`: the outcome is
+/// known before the test runs.
+fn asserts_constants(name: &str, invocation: &Macro) -> bool {
+    let arguments = macro_arguments(invocation);
+    let compares = name.ends_with("_eq") || name.ends_with("_ne");
+
+    match arguments.as_slice() {
+        [left, right, ..] if compares => {
+            let same = left.to_token_stream().to_string() == right.to_token_stream().to_string();
+
+            same || (is_constant(left) && is_constant(right))
+        }
+        [condition, ..] if !compares && !name.contains('_') => is_constant(condition),
+        _ => false,
+    }
+}
+
+/// A literal, or an expression built only from literals.
+fn is_constant(expr: &Expr) -> bool {
+    match expr {
+        Expr::Lit(_) => true,
+        Expr::Paren(inner) => is_constant(&inner.expr),
+        Expr::Unary(unary) => {
+            matches!(unary.op, UnOp::Not(_) | UnOp::Neg(_)) && is_constant(&unary.expr)
+        }
+        Expr::Binary(binary) => is_constant(&binary.left) && is_constant(&binary.right),
+        _ => false,
+    }
+}
+
 fn is_vague(name: &str) -> bool {
     let bare = name.trim_start_matches('_');
 
@@ -272,6 +309,20 @@ mod tests {
     #[test]
     fn asserting_through_a_helper_counts() {
         let text = "fn round_trips(input: &str) {\n    let output = render(&parse(input));\n\n    assert_eq!(output, input);\n}\n\nfn check(input: &str) {\n    round_trips(input);\n}\n\n#[test]\nfn frames_round_trip() {\n    check(\"a\");\n}\n\n#[test]\n#[should_panic(expected = \"empty\")]\nfn an_empty_frame_panics() {\n    parse(\"\");\n}\n";
+
+        assert_eq!(lines_of(Rule::TestMustAssert, text), NONE);
+    }
+
+    #[test]
+    fn asserting_constants_doesnt_count() {
+        let text = "#[test]\nfn always_passes() {\n    run();\n    assert!(true);\n    assert_eq!(1 + 1, 2);\n    assert_ne!(SIZE, SIZE);\n}\n\n#[test]\nfn checks_the_output() {\n    let output = run();\n\n    assert!(output.is_empty(), \"{output}\");\n}\n";
+
+        assert_eq!(lines_of(Rule::TestMustAssert, text), [2]);
+    }
+
+    #[test]
+    fn assertion_methods_and_snapshot_macros_count() {
+        let text = "#[test]\nfn exits_cleanly() {\n    Command::cargo_bin(NAME).assert().success();\n}\n\n#[test]\nfn renders_the_frame() {\n    insta::assert_snapshot!(render(FRAME));\n}\n";
 
         assert_eq!(lines_of(Rule::TestMustAssert, text), NONE);
     }

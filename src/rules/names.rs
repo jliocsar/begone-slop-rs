@@ -18,6 +18,17 @@ use syn::{
 use super::abbreviations::words;
 use super::{Finding, Rule};
 
+/// `x0`, `y1`, `p2`: a short base and a number is an index, not a copy.
+const MAX_COORDINATE_LETTERS: usize = 2;
+
+const BIT_WIDTHS: [&str; 8] = ["8", "16", "32", "64", "128", "256", "384", "512"];
+
+/// Words whose number is part of the term.
+const NUMBERED_TERMS: [&str; 16] = [
+    "aarch", "base", "blake", "crc", "float", "int", "ipv", "iso", "latin", "md", "rfc", "sha",
+    "uint", "ucs", "utf", "win",
+];
+
 const TYPE_WORDS: [&str; 10] = [
     "arr", "btreemap", "btreeset", "dict", "hashmap", "hashset", "obj", "str", "vec", "vector",
 ];
@@ -182,14 +193,19 @@ impl<'ast> Visit<'ast> for Names {
     }
 }
 
-/// `item2` and `item_2` give `item`; `sha256` gives `sha`, which only counts when `sha`
-/// (or `sha1`) is declared too.
+/// `item2` and `item_2` give `item`. A number that's part of the name isn't a copy: a
+/// coordinate (`x0`, `x1`: bases of two letters or fewer), a bit width (`hash64`), or a term
+/// that carries one (`utf8`, `ipv6`, `sha256`, `base64`).
 fn numbered_base(name: &str) -> Option<&str> {
     let base = name.trim_end_matches(|character: char| character.is_ascii_digit());
+    let number = name.get(base.len()..).unwrap_or_default();
+    let base = base.trim_end_matches('_');
+    let word = base.rsplit('_').next().unwrap_or(base);
+    let part_of_the_name = word.len() <= MAX_COORDINATE_LETTERS
+        || BIT_WIDTHS.contains(&number)
+        || NUMBERED_TERMS.contains(&word.to_ascii_lowercase().as_str());
 
-    (base.len() < name.len())
-        .then(|| base.trim_end_matches('_'))
-        .filter(|base| !base.is_empty())
+    (!number.is_empty() && !part_of_the_name).then_some(base)
 }
 
 pub(super) fn check(file: &syn::File) -> Vec<Finding> {
@@ -212,6 +228,13 @@ mod tests {
         let text = "fn merge(item: Item) {\n    let item2 = item.clone();\n    let sha256 = digest(&item2);\n}\n";
 
         assert_eq!(lines_of(Rule::NoNumberedNames, text), [2]);
+    }
+
+    #[test]
+    fn numbers_that_belong_to_the_name_pass() {
+        let text = "fn span(x0: u32, x1: u32, ipv4: Addr, ipv6: Addr, utf8: Text, utf16: Text) {\n    let sha1 = digest(PAST);\n    let sha256 = digest(NOW);\n    let base = 0;\n    let base64 = encode(base);\n    let md5 = hash(base64);\n    let h264 = codec();\n    let x86 = arch();\n    let x64 = arch();\n    let i18n = text();\n    let seed = 0;\n    let seed64 = widen(seed);\n}\n";
+
+        assert_eq!(lines_of(Rule::NoNumberedNames, text), NONE);
     }
 
     #[test]

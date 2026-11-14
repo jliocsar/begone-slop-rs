@@ -2,21 +2,72 @@
 //!
 //! begone-slop's `prefer-effect-match`, in Rust's own terms. A chain of three or more
 //! `subject == VALUE` tests (or `||` of them) restates a `match`, minus the compiler checking
-//! that every case is covered.
+//! that every case is covered. When the values are strings, a `match` on them is what
+//! `no-stringly-match` rejects, so outside a parse (`FromStr`, `TryFrom`, `parse*`, `from_*`) the
+//! advice is the same as that rule's: parse into an enum.
 
 use quote::ToTokens;
 use syn::visit::{self, Visit};
-use syn::{BinOp, Expr, ExprIf};
+use syn::{BinOp, Expr, ExprIf, ImplItemFn, ItemFn, ItemImpl, Lit};
 
 use super::{Finding, Rule};
 
 const MIN_BRANCHES: usize = 3;
+const PARSE_PREFIXES: [&str; 2] = ["from_", "parse"];
+const PARSE_TRAITS: [&str; 2] = ["FromStr", "TryFrom"];
+
+/// What a chain compares its subject to.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Values {
+    Fixed,
+    Strings,
+}
 
 struct PreferMatch {
     findings: Vec<Finding>,
+    parse_depth: usize,
+}
+
+impl PreferMatch {
+    fn message(&self, subject: &str, values: Values) -> String {
+        if values == Values::Strings && self.parse_depth == 0 {
+            format!(
+                "this chain compares `{subject}` to strings; parse it into an enum once, at the boundary, and match on that"
+            )
+        } else {
+            format!(
+                "this chain compares `{subject}` to fixed values; write it as a `match` so the compiler checks the cases"
+            )
+        }
+    }
 }
 
 impl<'ast> Visit<'ast> for PreferMatch {
+    fn visit_impl_item_fn(&mut self, method: &'ast ImplItemFn) {
+        let parses = is_parse_name(&method.sig.ident.to_string());
+        self.parse_depth += usize::from(parses);
+        visit::visit_impl_item_fn(self, method);
+        self.parse_depth -= usize::from(parses);
+    }
+
+    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
+        let parses = is_parse_name(&function.sig.ident.to_string());
+        self.parse_depth += usize::from(parses);
+        visit::visit_item_fn(self, function);
+        self.parse_depth -= usize::from(parses);
+    }
+
+    fn visit_item_impl(&mut self, implementation: &'ast ItemImpl) {
+        let parses = implementation
+            .trait_
+            .as_ref()
+            .and_then(|(_, path, _)| path.segments.last())
+            .is_some_and(|segment| PARSE_TRAITS.iter().any(|name| segment.ident == name));
+        self.parse_depth += usize::from(parses);
+        visit::visit_item_impl(self, implementation);
+        self.parse_depth -= usize::from(parses);
+    }
+
     fn visit_expr_if(&mut self, branch: &'ast ExprIf) {
         let subjects: Option<Vec<String>> = chain(branch)
             .iter()
@@ -30,10 +81,20 @@ impl<'ast> Visit<'ast> for PreferMatch {
         if one_subject
             && let Some(subject) = subjects.as_ref().and_then(|subjects| subjects.first())
         {
+            let strings = chain(branch)
+                .iter()
+                .any(|link| compares_strings(&link.cond));
+
+            let values = if strings {
+                Values::Strings
+            } else {
+                Values::Fixed
+            };
+
             self.findings.push(Finding {
                 line: branch.if_token.span.start().line,
                 rule: Rule::PreferMatch,
-                message: format!("this chain compares `{subject}` to fixed values; write it as a `match` so the compiler checks the cases"),
+                message: self.message(subject, values),
                 edit: None,
             });
         }
@@ -80,6 +141,24 @@ fn subject_of(condition: &Expr) -> Option<String> {
     }
 }
 
+/// Whether any value the condition compares against is a string literal.
+fn compares_strings(condition: &Expr) -> bool {
+    match condition {
+        Expr::Binary(binary) => match binary.op {
+            BinOp::Eq(_) => {
+                matches!(&*binary.right, Expr::Lit(literal) if matches!(literal.lit, Lit::Str(_)))
+            }
+            BinOp::Or(_) => compares_strings(&binary.left) || compares_strings(&binary.right),
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn is_parse_name(name: &str) -> bool {
+    PARSE_PREFIXES.iter().any(|prefix| name.starts_with(prefix))
+}
+
 /// A literal, or a path such as an enum variant or a constant.
 fn is_fixed(expr: &Expr) -> bool {
     matches!(expr, Expr::Lit(_) | Expr::Path(_))
@@ -88,6 +167,7 @@ fn is_fixed(expr: &Expr) -> bool {
 pub(super) fn check(file: &syn::File) -> Vec<Finding> {
     let mut prefer_match = PreferMatch {
         findings: Vec::new(),
+        parse_depth: 0,
     };
     prefer_match.visit_file(file);
 
@@ -97,7 +177,31 @@ pub(super) fn check(file: &syn::File) -> Vec<Finding> {
 #[cfg(test)]
 mod tests {
     use crate::rules::Rule;
-    use crate::rules::testing::{NONE, lines_of};
+    use crate::rules::testing::{NONE, findings, lines_of};
+
+    fn messages(text: &str) -> Vec<String> {
+        findings("src/sample.rs", text)
+            .into_iter()
+            .filter(|finding| finding.rule == Rule::PreferMatch)
+            .map(|finding| finding.message)
+            .collect()
+    }
+
+    #[test]
+    fn a_string_chain_is_told_to_parse_into_an_enum() {
+        let chain = "    if name == \"fast\" {\n        3\n    } else if name == \"slow\" {\n        1\n    } else if name == \"off\" {\n        0\n    } else {\n        2\n    }\n";
+        let text = format!(
+            "fn speed(name: &str) -> u8 {{\n{chain}}}\n\nfn parse_speed(name: &str) -> u8 {{\n{chain}}}\n"
+        );
+
+        assert_eq!(
+            messages(&text),
+            [
+                "this chain compares `name` to strings; parse it into an enum once, at the boundary, and match on that",
+                "this chain compares `name` to fixed values; write it as a `match` so the compiler checks the cases",
+            ]
+        );
+    }
 
     #[test]
     fn a_chain_of_equality_tests_is_a_match() {
