@@ -278,6 +278,11 @@ before it ships. The presets are this repo's own `clippy.toml`, `rustfmt.toml` a
 test fails if `Cargo.toml` drifts from `preset/lints.toml`, and another runs the syntax rules over
 `src/` and `tests/`.
 
+A syntax rule is declared once, in the `rules!` table in `src/rules.rs` (its name, whether it
+guards the gate, whether `--fix` fixes it), and its check is one more entry in `CHECKS`. A
+pattern rule is one more id in `ast_grep::RULES`. Tests fail when this README's rule tables and
+lists don't match them.
+
 ```sh
 git config core.hooksPath .githooks   # the gate on every commit
 scripts/check                         # fmt, clippy, tests, cargo bs, ast-grep tests

@@ -7,57 +7,28 @@ use std::process::Command;
 
 use crate::check::Mode;
 
+/// Each pattern rule's id with the text of `rules/<id>.yml`, so an id is written once.
+macro_rules! pattern_rules {
+    ($($id:literal),* $(,)?) => {
+        [$(($id, include_str!(concat!("../rules/", $id, ".yml")))),*]
+    };
+}
+
 /// The files in `rules/`, by id. A test keeps this list and the directory equal.
-pub const RULES: [(&str, &str); 13] = [
-    (
-        "error-message-style",
-        include_str!("../rules/error-message-style.yml"),
-    ),
-    (
-        "no-box-dyn-error",
-        include_str!("../rules/no-box-dyn-error.yml"),
-    ),
-    (
-        "no-catch-unwind",
-        include_str!("../rules/no-catch-unwind.yml"),
-    ),
-    (
-        "no-detached-tasks",
-        include_str!("../rules/no-detached-tasks.yml"),
-    ),
-    (
-        "no-glob-reexport",
-        include_str!("../rules/no-glob-reexport.yml"),
-    ),
-    (
-        "no-global-state",
-        include_str!("../rules/no-global-state.yml"),
-    ),
-    ("no-rc-refcell", include_str!("../rules/no-rc-refcell.yml")),
-    (
-        "no-string-error",
-        include_str!("../rules/no-string-error.yml"),
-    ),
-    (
-        "no-stringified-error",
-        include_str!("../rules/no-stringified-error.yml"),
-    ),
-    (
-        "no-stringly-match",
-        include_str!("../rules/no-stringly-match.yml"),
-    ),
-    (
-        "no-swallowed-parse",
-        include_str!("../rules/no-swallowed-parse.yml"),
-    ),
-    (
-        "no-untyped-json",
-        include_str!("../rules/no-untyped-json.yml"),
-    ),
-    (
-        "todo-needs-issue",
-        include_str!("../rules/todo-needs-issue.yml"),
-    ),
+pub const RULES: [(&str, &str); 13] = pattern_rules![
+    "error-message-style",
+    "no-box-dyn-error",
+    "no-catch-unwind",
+    "no-detached-tasks",
+    "no-glob-reexport",
+    "no-global-state",
+    "no-rc-refcell",
+    "no-string-error",
+    "no-stringified-error",
+    "no-stringly-match",
+    "no-swallowed-parse",
+    "no-untyped-json",
+    "todo-needs-issue",
 ];
 
 /// A config file with nothing in it, so a project's `sgconfig.yml` isn't read.
@@ -157,5 +128,22 @@ mod tests {
         for (id, text) in RULES {
             assert!(text.starts_with(&format!("id: {id}\n")), "{id}");
         }
+    }
+
+    #[test]
+    fn the_readme_lists_every_pattern_rule() {
+        let readme = include_str!("../README.md");
+        let mut listed: Vec<&str> = readme
+            .split("## Pattern rules")
+            .nth(1)
+            .and_then(|rest| rest.split("\n## ").next())
+            .unwrap()
+            .lines()
+            .filter_map(|line| Some(line.strip_prefix("| `")?.split_once('`')?.0))
+            .collect();
+        listed.sort_unstable();
+        let ids: Vec<&str> = RULES.iter().map(|(id, _)| *id).collect();
+
+        assert_eq!(listed, ids);
     }
 }
