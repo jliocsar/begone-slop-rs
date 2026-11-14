@@ -130,6 +130,8 @@ rules! {
     TestEarlyReturn => "test-early-return", Syntax, false;
     TestMustAssert => "test-must-assert", Syntax, false;
     TestName => "test-name", Syntax, false;
+    UnknownWaiver => "unknown-waiver", Gate, false;
+    UnusedWaiver => "unused-waiver", Gate, false;
     UseGroups => "use-groups", Syntax, true;
     WaiverNeedsReason => "waiver-needs-reason", Gate, false;
 }
@@ -288,13 +290,15 @@ pub struct Finding {
     pub edit: Option<Edit>,
 }
 
-/// Runs every syntax rule on one file, minus the findings a `bs-allow` comment waives.
+/// Runs every syntax rule on one file, minus the findings a `bs-allow` comment waives, plus
+/// a finding for each waiver that waived nothing.
 #[must_use]
 pub fn run(file: &FileContext) -> Vec<Finding> {
-    let mut findings: Vec<Finding> = CHECKS.iter().flat_map(|check| check(file)).collect();
-    findings.retain(|finding| {
-        !finding.rule.is_waivable() || !file.source.waives(finding.line, finding.rule.name())
-    });
+    let (waived, mut findings): (Vec<Finding>, Vec<Finding>) = CHECKS
+        .iter()
+        .flat_map(|check| check(file))
+        .partition(|finding| file.waivers.iter().any(|waiver| waiver.waives(finding)));
+    findings.extend(waivers::unused(&file.waivers, &waived));
     findings.sort_by_key(|finding| finding.line);
 
     findings
@@ -391,6 +395,8 @@ mod tests {
                 "no-crate-level-allow",
                 "no-forbidden-expects",
                 "no-hidden-code",
+                "unknown-waiver",
+                "unused-waiver",
                 "waiver-needs-reason"
             ]
         );

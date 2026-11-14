@@ -38,11 +38,11 @@ pub struct Comment {
     pub after_code: bool,
 }
 
-/// A Rust source file, split into lines.
+/// A Rust source file, split into lines, with the comments a lexer found in it.
 pub struct Source {
     pub path: PathBuf,
     pub lines: Vec<String>,
-    pub comments: Vec<Comment>,
+    comments: Vec<Comment>,
     line_break: &'static str,
     trailing_newline: bool,
 }
@@ -95,26 +95,23 @@ impl Source {
         self.line(number).is_none_or(|text| text.trim().is_empty())
     }
 
-    /// `// bs-allow(<rule>): <reason>` on a finding's line or the line above waives it. Only a
-    /// plain `//` comment that opens with the marker counts (not a string that contains it),
-    /// and the reason has to be a sentence: a waiver nobody explained is slop too.
+    /// Every comment in the file, in order, told apart from string and character literals
+    /// that look like one. This is the only place the rules find comments.
     #[must_use]
-    pub fn waives(&self, number: usize, rule: &str) -> bool {
-        let marker = format!("bs-allow({rule}):");
-
-        self.comments
-            .iter()
-            .filter(|comment| comment.kind == CommentKind::Line)
-            .filter(|comment| comment.line == number || comment.line + 1 == number)
-            .any(|comment| {
-                comment
-                    .text
-                    .trim_start()
-                    .strip_prefix(&marker)
-                    .is_some_and(is_real_reason)
-            })
+    pub fn comments(&self) -> &[Comment] {
+        &self.comments
     }
 
+    /// Whether a comment opens on line `number` with nothing but whitespace before it.
+    #[must_use]
+    pub fn starts_own_line_comment(&self, number: usize) -> bool {
+        self.comments
+            .iter()
+            .any(|comment| comment.line == number && !comment.after_code)
+    }
+
+    /// Rewrites lines as `edits` ask, then lexes the comments again: the next pass reads
+    /// them at their new lines.
     pub fn apply(&mut self, edits: &[Edit]) {
         let mut inserts: BTreeSet<usize> = BTreeSet::new();
         let mut deletes: BTreeSet<usize> = BTreeSet::new();
@@ -144,6 +141,7 @@ impl Source {
                 replaced.iter().cloned().chain(kept).chain(blank)
             })
             .collect();
+        self.comments = Lexer::comments(&self.text());
     }
 }
 
@@ -396,37 +394,19 @@ mod tests {
     }
 
     #[test]
-    fn a_waiver_needs_a_reason() {
-        let text = "// bs-allow(complexity): a parser is one big match\nfn parse() {}\n// bs-allow(complexity):\nfn other() {}\n";
-        let sample = source(text);
-
-        assert!(sample.waives(2, "complexity"));
-        assert!(!sample.waives(4, "complexity"));
-        assert!(!sample.waives(2, "padding"));
-    }
-
-    #[test]
-    fn a_marker_in_a_string_isnt_a_waiver() {
-        let text = "const NOTE: &str = \"bs-allow(no-boolean-trap): see the docs for this\";\nfn draw(filled: bool) {}\n";
-        let sample = source(text);
-
-        assert!(!sample.waives(2, "no-boolean-trap"));
-    }
-
-    #[test]
-    fn a_one_word_reason_doesnt_count() {
-        let sample = source("// bs-allow(complexity): fine\nfn parse() {}\n");
-
-        assert!(!sample.waives(2, "complexity"));
-    }
-
-    #[test]
     fn comments_are_told_apart_from_literals() {
         let text = "let url = \"http://x\"; // trailing\nlet raw = r#\"/* not */ \"//\"#;\nlet quote = '\"'; /* block\nspans */\n/// doc\nfn tick<'a>(x: &'a str) {} // last\n";
         let found: Vec<(usize, CommentKind, String, bool)> = source(text)
-            .comments
-            .into_iter()
-            .map(|comment| (comment.line, comment.kind, comment.text, comment.after_code))
+            .comments()
+            .iter()
+            .map(|comment| {
+                (
+                    comment.line,
+                    comment.kind,
+                    comment.text.clone(),
+                    comment.after_code,
+                )
+            })
             .collect();
 
         assert_eq!(
@@ -446,6 +426,19 @@ mod tests {
         sample.apply(&[Edit::InsertBlankAfter(1), Edit::DeleteLines(vec![3])]);
 
         assert_eq!(sample.text(), "one\n\ntwo\nthree\n");
+    }
+
+    #[test]
+    fn comments_move_with_the_lines_an_edit_moves() {
+        let mut sample = source("one();\n// note\ntwo();\n");
+        sample.apply(&[Edit::InsertBlankAfter(1)]);
+        let lines: Vec<usize> = sample
+            .comments()
+            .iter()
+            .map(|comment| comment.line)
+            .collect();
+
+        assert_eq!(lines, [3]);
     }
 
     #[test]

@@ -5,7 +5,7 @@
 //! rarely does both). Doc comments, `SAFETY:` notes and tool directives are never code.
 
 use super::{FileContext, Finding, Rule};
-use crate::source::Source;
+use crate::source::{CommentKind, Source};
 
 const CODE_MARKS: [&str; 7] = [";", "{", "}", "=>", "::", "->", "()"];
 
@@ -17,9 +17,11 @@ const DIRECTIVES: [&str; 5] = [
     "rustfmt::",
 ];
 
-/// One run of plain `//` comment lines: where it starts and its text without the markers.
+/// One run of plain `//` comment lines: where it starts and ends, and its text without the
+/// markers.
 struct CommentRun {
     line: usize,
+    last: usize,
     text: String,
 }
 
@@ -36,30 +38,27 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         .collect()
 }
 
+/// Plain `//` comments that each sit on their own line, grouped into runs of neighbours. The
+/// lexer's comments, so a line inside a string that starts with `//` is never one.
 fn runs(source: &Source) -> Vec<CommentRun> {
-    let plain_comment = |line: &str| {
-        let trimmed = line.trim_start();
-        let is_doc = trimmed.starts_with("///") || trimmed.starts_with("//!");
-
-        (trimmed.starts_with("//") && !is_doc)
-            .then(|| trimmed.trim_start_matches('/').trim().to_owned())
-    };
-
     source
-        .lines
+        .comments()
         .iter()
-        .zip(1..)
-        .fold(Vec::new(), |mut runs: Vec<CommentRun>, (line, number)| {
-            let previous_is_comment =
-                number > 1 && source.line(number - 1).and_then(plain_comment).is_some();
+        .filter(|comment| comment.kind == CommentKind::Line && !comment.after_code)
+        .fold(Vec::new(), |mut runs: Vec<CommentRun>, comment| {
+            let text = comment.text.trim_start_matches('/').trim();
 
-            match (plain_comment(line), runs.last_mut()) {
-                (Some(text), Some(run)) if previous_is_comment => {
+            match runs.last_mut() {
+                Some(run) if run.last + 1 == comment.line => {
                     run.text.push('\n');
-                    run.text.push_str(&text);
+                    run.text.push_str(text);
+                    run.last = comment.line;
                 }
-                (Some(text), _) => runs.push(CommentRun { line: number, text }),
-                (None, _) => {}
+                _ => runs.push(CommentRun {
+                    line: comment.line,
+                    last: comment.line,
+                    text: text.to_owned(),
+                }),
             }
 
             runs
@@ -97,6 +96,21 @@ mod tests {
     fn a_safety_note_is_left_alone() {
         let text =
             "fn run() {\n    // SAFETY: the pointer came from Box::into_raw();\n    go();\n}\n";
+
+        assert_eq!(lines_of(Rule::NoCommentedOutCode, text), NONE);
+    }
+
+    #[test]
+    fn code_inside_a_raw_string_isnt_a_comment() {
+        let text =
+            "const FIXTURE: &str = r#\"\n// let old = legacy(input);\n// old.flush();\n\"#;\n";
+
+        assert_eq!(lines_of(Rule::NoCommentedOutCode, text), NONE);
+    }
+
+    #[test]
+    fn code_after_code_on_its_line_isnt_a_run() {
+        let text = "fn run() {\n    go(); // let old = legacy(input);\n}\n";
 
         assert_eq!(lines_of(Rule::NoCommentedOutCode, text), NONE);
     }
