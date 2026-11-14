@@ -5,7 +5,7 @@ use crate::source::{Edit, Source};
 
 /// The lines strictly between the end of one unit and the start of the next.
 #[derive(Clone, Copy, Debug)]
-pub struct Gap {
+pub(super) struct Gap {
     pub after: usize,
     pub before: usize,
 }
@@ -26,7 +26,12 @@ impl Gap {
     }
 }
 
-pub fn require_blank(source: &Source, gap: Gap, rule: Rule, reason: &str) -> Option<Finding> {
+pub(super) fn require_blank(
+    source: &Source,
+    gap: Gap,
+    rule: Rule,
+    reason: &str,
+) -> Option<Finding> {
     if gap.after >= gap.before || gap.has_blank(source) {
         return None;
     }
@@ -39,7 +44,7 @@ pub fn require_blank(source: &Source, gap: Gap, rule: Rule, reason: &str) -> Opt
     })
 }
 
-pub fn forbid_blank(source: &Source, gap: Gap, rule: Rule, reason: &str) -> Option<Finding> {
+pub(super) fn forbid_blank(source: &Source, gap: Gap, rule: Rule, reason: &str) -> Option<Finding> {
     if gap.has_comment(source) {
         return None;
     }

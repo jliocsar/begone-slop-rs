@@ -10,7 +10,7 @@ use crate::source::Source;
 
 const CRATE_ROOTS: [&str; 2] = ["lib.rs", "main.rs"];
 
-pub fn check(source: &Source, file: &File) -> Option<Finding> {
+pub(super) fn check(source: &Source, file: &File) -> Option<Finding> {
     let is_root = source
         .path
         .file_name()

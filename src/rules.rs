@@ -57,16 +57,16 @@ pub(crate) mod testing {
     use super::{Finding, Rule};
     use crate::source::Source;
 
-    pub const NONE: [usize; 0] = [];
+    pub(crate) const NONE: [usize; 0] = [];
 
-    pub fn findings(path: &str, text: &str) -> Vec<Finding> {
+    pub(crate) fn findings(path: &str, text: &str) -> Vec<Finding> {
         let source = Source::new(path.into(), text);
         let file = syn::parse_file(text).expect("test input parses");
 
         super::run(&source, &file)
     }
 
-    pub fn lines_of(rule: Rule, text: &str) -> Vec<usize> {
+    pub(crate) fn lines_of(rule: Rule, text: &str) -> Vec<usize> {
         findings("src/sample.rs", text)
             .into_iter()
             .filter(|finding| finding.rule == rule)
@@ -74,7 +74,7 @@ pub(crate) mod testing {
             .collect()
     }
 
-    pub fn fixed(text: &str) -> String {
+    pub(crate) fn fixed(text: &str) -> String {
         let mut source = Source::new("src/sample.rs".into(), text);
         let file = syn::parse_file(text).expect("test input parses");
         let edits: Vec<_> = super::run(&source, &file)

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// The files in `rules/`, by id. A test keeps this list and the directory equal.
-pub const RULES: [(&str, &str); 7] = [
+pub const RULES: [(&str, &str); 6] = [
     (
         "no-box-dyn-error",
         include_str!("../rules/no-box-dyn-error.yml"),
@@ -14,10 +14,6 @@ pub const RULES: [(&str, &str); 7] = [
     (
         "no-catch-unwind",
         include_str!("../rules/no-catch-unwind.yml"),
-    ),
-    (
-        "no-discarded-ok",
-        include_str!("../rules/no-discarded-ok.yml"),
     ),
     (
         "no-glob-reexport",

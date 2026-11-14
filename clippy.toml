@@ -11,3 +11,17 @@ allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-panic-in-tests = true
 allow-dbg-in-tests = true
+
+# begone-slop's statement-order, read by rustc: imports, constants, types with their impls,
+# then free functions. Only the groups are ordered; nothing is sorted alphabetically.
+source-item-ordering = ["module"]
+module-items-ordered-within-groupings = "none"
+module-item-order-groupings = [
+    ["modules", ["extern_crate", "mod", "foreign_mod"]],
+    ["use", ["use"]],
+    ["macros", ["macro"]],
+    ["global_asm", ["global_asm"]],
+    ["constants", ["static", "const"]],
+    ["types", ["ty_alias", "enum", "struct", "union", "trait", "trait_alias", "impl"]],
+    ["functions", ["fn"]],
+]

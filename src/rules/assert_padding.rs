@@ -20,39 +20,6 @@ struct AssertPadding<'source> {
     test_depth: usize,
 }
 
-pub fn check(source: &Source, file: &File) -> Vec<Finding> {
-    let test_file = source
-        .path
-        .components()
-        .any(|component| component == Component::Normal("tests".as_ref()));
-    let mut padding = AssertPadding {
-        source,
-        findings: Vec::new(),
-        test_file,
-        test_depth: 0,
-    };
-    padding.visit_file(file);
-
-    padding.findings
-}
-
-fn is_test_fn(attributes: &[Attribute]) -> bool {
-    attributes.iter().any(|attribute| {
-        attribute
-            .path()
-            .segments
-            .last()
-            .is_some_and(|segment| segment.ident == "test")
-    })
-}
-
-fn is_test_module(attributes: &[Attribute]) -> bool {
-    attributes.iter().any(|attribute| {
-        attribute.path().is_ident("cfg")
-            && matches!(&attribute.meta, Meta::List(list) if list.tokens.to_string() == "test")
-    })
-}
-
 impl AssertPadding<'_> {
     fn in_tests(&self) -> bool {
         self.test_file || self.test_depth > 0
@@ -119,6 +86,39 @@ impl<'ast> Visit<'ast> for AssertPadding<'_> {
             visit::visit_item_mod(padding, module);
         });
     }
+}
+
+fn is_test_fn(attributes: &[Attribute]) -> bool {
+    attributes.iter().any(|attribute| {
+        attribute
+            .path()
+            .segments
+            .last()
+            .is_some_and(|segment| segment.ident == "test")
+    })
+}
+
+fn is_test_module(attributes: &[Attribute]) -> bool {
+    attributes.iter().any(|attribute| {
+        attribute.path().is_ident("cfg")
+            && matches!(&attribute.meta, Meta::List(list) if list.tokens.to_string() == "test")
+    })
+}
+
+pub(super) fn check(source: &Source, file: &File) -> Vec<Finding> {
+    let test_file = source
+        .path
+        .components()
+        .any(|component| component == Component::Normal("tests".as_ref()));
+    let mut padding = AssertPadding {
+        source,
+        findings: Vec::new(),
+        test_file,
+        test_depth: 0,
+    };
+    padding.visit_file(file);
+
+    padding.findings
 }
 
 #[cfg(test)]

@@ -16,7 +16,7 @@ const ASSERT_MACROS: [&str; 7] = [
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Kind {
+pub(super) enum Kind {
     Assert,
     BlockLike,
     Const { public: bool },
@@ -28,21 +28,21 @@ pub enum Kind {
 
 /// One statement or item, from its first attribute to its last token.
 #[derive(Clone, Copy, Debug)]
-pub struct Unit {
+pub(super) struct Unit {
     pub start: usize,
     pub end: usize,
     pub kind: Kind,
 }
 
 impl Unit {
-    pub fn gap_to(self, next: Self) -> Gap {
+    pub(super) fn gap_to(self, next: Self) -> Gap {
         Gap {
             after: self.end,
             before: next.start,
         }
     }
 
-    pub fn of_stmt(stmt: &Stmt) -> Self {
+    pub(super) fn of_stmt(stmt: &Stmt) -> Self {
         let (start, end) = lines_of(stmt);
         let multi_line = end > start;
 
@@ -56,7 +56,7 @@ impl Unit {
         Self { start, end, kind }
     }
 
-    pub fn of_item(item: &Item) -> Self {
+    pub(super) fn of_item(item: &Item) -> Self {
         let (start, end) = lines_of(item);
 
         Self {
@@ -66,7 +66,7 @@ impl Unit {
         }
     }
 
-    pub fn of_impl_item(item: &ImplItem) -> Self {
+    pub(super) fn of_impl_item(item: &ImplItem) -> Self {
         let (start, end) = lines_of(item);
         let multi_line = end > start;
 
@@ -82,7 +82,7 @@ impl Unit {
         Self { start, end, kind }
     }
 
-    pub fn of_trait_item(item: &TraitItem) -> Self {
+    pub(super) fn of_trait_item(item: &TraitItem) -> Self {
         let (start, end) = lines_of(item);
         let multi_line = end > start;
 

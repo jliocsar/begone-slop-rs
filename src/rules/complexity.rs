@@ -23,15 +23,6 @@ struct Branches {
     count: usize,
 }
 
-pub fn check(file: &File) -> Vec<Finding> {
-    let mut functions = Functions {
-        findings: Vec::new(),
-    };
-    functions.visit_file(file);
-
-    functions.findings
-}
-
 impl Functions {
     fn measure(&mut self, name: &Ident, body: &Block) {
         let mut branches = Branches { count: 1 };
@@ -117,6 +108,15 @@ impl<'ast> Visit<'ast> for Branches {
         self.count += usize::from(diverges);
         visit::visit_local(self, local);
     }
+}
+
+pub(super) fn check(file: &File) -> Vec<Finding> {
+    let mut functions = Functions {
+        findings: Vec::new(),
+    };
+    functions.visit_file(file);
+
+    functions.findings
 }
 
 #[cfg(test)]

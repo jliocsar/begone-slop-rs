@@ -24,34 +24,6 @@ struct Padding<'source> {
     findings: Vec<Finding>,
 }
 
-pub fn check(source: &Source, file: &File) -> Vec<Finding> {
-    let mut padding = Padding {
-        source,
-        findings: Vec::new(),
-    };
-    padding.visit_file(file);
-
-    padding.findings
-}
-
-/// The first arm that matches wins, so the narrow cases sit above the broad ones.
-fn expected(previous: Kind, next: Kind) -> Blank {
-    match (previous, next) {
-        (Kind::Const { public: left }, Kind::Const { public: right }) if left == right => {
-            Blank::Never("inside a group of constants")
-        }
-        (Kind::Const { .. }, _) | (_, Kind::Const { .. }) => {
-            Blank::Always("around a group of constants")
-        }
-        (Kind::Use, Kind::Use) => Blank::Any,
-        (Kind::Use, _) => Blank::Always("after the imports"),
-        (_, Kind::Return) => Blank::Always("before a return"),
-        (Kind::BlockLike | Kind::ItemBlock, _) => Blank::Always("after a block"),
-        (_, Kind::BlockLike | Kind::ItemBlock) => Blank::Always("before a block"),
-        _ => Blank::Any,
-    }
-}
-
 impl Padding<'_> {
     fn sequence(&mut self, units: impl Iterator<Item = Unit>) {
         let units: Vec<Unit> = units.collect();
@@ -102,6 +74,34 @@ impl<'ast> Visit<'ast> for Padding<'_> {
         self.sequence(definition.items.iter().map(Unit::of_trait_item));
         visit::visit_item_trait(self, definition);
     }
+}
+
+/// The first arm that matches wins, so the narrow cases sit above the broad ones.
+fn expected(previous: Kind, next: Kind) -> Blank {
+    match (previous, next) {
+        (Kind::Const { public: left }, Kind::Const { public: right }) if left == right => {
+            Blank::Never("inside a group of constants")
+        }
+        (Kind::Const { .. }, _) | (_, Kind::Const { .. }) => {
+            Blank::Always("around a group of constants")
+        }
+        (Kind::Use, Kind::Use) => Blank::Any,
+        (Kind::Use, _) => Blank::Always("after the imports"),
+        (_, Kind::Return) => Blank::Always("before a return"),
+        (Kind::BlockLike | Kind::ItemBlock, _) => Blank::Always("after a block"),
+        (_, Kind::BlockLike | Kind::ItemBlock) => Blank::Always("before a block"),
+        _ => Blank::Any,
+    }
+}
+
+pub(super) fn check(source: &Source, file: &File) -> Vec<Finding> {
+    let mut padding = Padding {
+        source,
+        findings: Vec::new(),
+    };
+    padding.visit_file(file);
+
+    padding.findings
 }
 
 #[cfg(test)]

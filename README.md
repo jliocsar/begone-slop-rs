@@ -53,13 +53,17 @@ never edits your Cargo.toml.
 | `id-length` (2+, except `i`/`j`)            | `min_ident_chars` + `allowed-idents-below-min-chars`                 |
 | SCREAMING_SNAKE constants                   | rustc's own `non_upper_case_globals`, which needs no type info       |
 | `require-safety-comment-for-type-assertion` | `undocumented_unsafe_blocks`, plus `allow_attributes_without_reason` |
-| `no-silent-error-swallow`                   | `let_underscore_must_use`, `map_err_ignore`, `no-discarded-ok`       |
+| `no-silent-error-swallow`                   | `let_underscore_must_use`, `map_err_ignore`, `unused_result_ok`      |
 | `no-else-return`                            | `redundant_else` (pedantic)                                          |
 | `max-lines-per-function`                    | `too_many_lines` (pedantic)                                          |
 | `complexity`                                | `complexity` below, plus `excessive-nesting-threshold = 5`           |
 | `no-try-catch`                              | `no-catch-unwind`                                                    |
 | `no-unknown-parameters` and friends         | `no-untyped-json`; the type system covers the rest                   |
 | `no-reexport-only-modules`                  | `reexport-only-module`, `no-glob-reexport`                           |
+| `statement-order`                           | `arbitrary_source_item_ordering`, grouped in `clippy.toml`           |
+| panics in fallible code, dead `pub`         | `panic_in_result_fn`, `unwrap_in_result`, `unreachable_pub`          |
+| test assertions that hide the error         | `assertions_on_result_states`                                        |
+| one module layout                           | `mod_module_files`: `foo.rs` next to `foo/`, never `foo/mod.rs`      |
 
 Clippy's own `cognitive_complexity` is left off. Clippy's docs say it doesn't measure what it
 claims to, so `cargo bs` counts cyclomatic complexity itself.
@@ -113,7 +117,6 @@ fn key_name(key: Key) -> &'static str {
 | `no-string-error`      | `Result<T, String>` and `Result<T, &str>`                         |
 | `no-box-dyn-error`     | `Box<dyn Error>` outside binaries, build scripts, tests, examples |
 | `no-stringified-error` | `.map_err(\|e\| e.to_string())`, `format!` and friends            |
-| `no-discarded-ok`      | `result.ok();` as a statement                                     |
 | `no-catch-unwind`      | `catch_unwind` used as try/catch                                  |
 | `no-glob-reexport`     | `pub use module::*`                                               |
 | `no-untyped-json`      | `serde_json::Value`, the `unknown` of Rust                        |
