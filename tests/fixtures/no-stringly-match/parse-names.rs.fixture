@@ -1,0 +1,29 @@
+//! String arms belong in the function that turns the string into a type, whatever it's called.
+
+fn decode(name: &str) -> Event {
+    match name {
+        "bell" => Event::Bell,
+        _ => Event::Other,
+    }
+}
+
+fn parse_mode(text: &str) -> Mode {
+    match text {
+        "fast" => Mode::Fast,
+        _ => Mode::Slow,
+    }
+}
+
+fn from_wire(text: &str) -> Mode {
+    match text {
+        "fast" => Mode::Fast,
+        _ => Mode::Slow,
+    }
+}
+
+fn run(mode: &str) { //~ no-stringly-fields
+    match mode { //~ no-stringly-match
+        "fast" => go(),
+        _ => wait(),
+    }
+}
