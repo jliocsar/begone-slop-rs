@@ -1,0 +1,3 @@
+// ast-grep-ignore: waiver-needs-reason -- x //~ module-doc, waiver-needs-reason
+// ast-grep-ignore //~ waiver-needs-reason
+fn one() -> Result<u8, String> { todo() }

@@ -1,0 +1,49 @@
+//! Test hygiene loopholes.
+
+#[cfg(test)]
+mod tests {
+    use std::thread::sleep as pause;
+    use std::time::{Duration, Instant};
+
+    fn run() {
+        assert!(true);
+    }
+
+    #[test]
+    fn trivially_true() { //~ test-must-assert
+        let parsed = parse("x");
+
+        assert!(true);
+    }
+
+    #[test]
+    fn name_collision_counts_as_asserting() { //~ test-must-assert
+        let server = Server::new();
+        server.run();
+    }
+
+    #[test]
+    fn aliased_sleep() { //~ test-must-assert
+        pause(Duration::from_millis(50));
+        tokio::time::sleep_until(Instant::now()).await;
+        let deadline = Instant::now() + Duration::from_millis(50);
+        while Instant::now() < deadline {} //~ padding
+
+        assert_eq!(1, 1);
+    }
+
+    #[test]
+    fn cli_exits_cleanly() {
+        Command::cargo_bin("x").unwrap().assert().success();
+    }
+
+    #[test]
+    fn sanity() {
+        assert_eq!(parse("x"), 1);
+    }
+
+    #[test]
+    fn check() {
+        assert_eq!(parse("x"), 1);
+    }
+}

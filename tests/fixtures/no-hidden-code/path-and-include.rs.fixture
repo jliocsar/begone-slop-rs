@@ -1,0 +1,6 @@
+//! Crate root.
+
+#[path = "core.inc"]
+mod core_logic; //~ no-hidden-code
+
+include!("more.in"); //~ no-hidden-code

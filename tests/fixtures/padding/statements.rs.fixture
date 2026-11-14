@@ -1,0 +1,18 @@
+//! Missing and extra blank lines, which `--fix` settles in one go.
+use std::fmt;
+fn run(ready: bool) -> u8 { //~ no-boolean-trap, padding
+    let count = 1;
+    if ready { //~ padding
+        go();
+    }
+    let total = count + 1; //~ padding
+
+
+    let doubled = total * 2;
+    match doubled { //~ padding
+        0 => 1,
+        _ => 2,
+    };
+    return doubled; //~ padding
+}
+fn next() {} //~ padding

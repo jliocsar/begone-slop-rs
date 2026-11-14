@@ -1,0 +1,7 @@
+//! Shapes.
+
+mod circle;
+mod square;
+
+pub use circle::Circle;
+pub use square::Square;

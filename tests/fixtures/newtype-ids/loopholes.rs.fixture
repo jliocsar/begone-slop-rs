@@ -1,0 +1,22 @@
+//! Signature-rule loopholes.
+
+type Flag = bool;
+type SessionId = String;
+type UserId = u64;
+
+struct Session {
+    session_id: SessionId, //~ newtype-ids
+    owner_id: UserId, //~ newtype-ids
+    parent_id: Option<String>,
+    peer_ids: HashMap<String, u8>,
+    status: Option<String>,
+    kinds: Vec<String>,
+    state_name: String,
+    tab_id: Rc<str>,
+}
+
+fn draw(filled: Flag, outlined: Option<bool>, shaded: &bool) {} //~ no-boolean-trap
+
+fn from_anything(mode: &str, session_id: String) {} //~ newtype-ids
+
+fn set_visible(visible: bool) {} //~ no-boolean-trap

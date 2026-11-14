@@ -1,0 +1,46 @@
+//! Wildcard-rule loopholes and a false alarm.
+
+use crate::vt::style;
+
+enum Underline {
+    None,
+    Single,
+    Double,
+}
+
+enum Mode {
+    Fast,
+    Slow,
+    Off,
+}
+
+type Speed = Mode;
+
+fn convert(underline: style::Underline) -> Underline {
+    match underline {
+        style::Underline::None => Underline::None,
+        style::Underline::Double => Underline::Double,
+        _ => Underline::Single,
+    }
+}
+
+fn aliased(mode: Speed) -> u8 {
+    match mode {
+        Speed::Fast => 3,
+        _ => 0,
+    }
+}
+
+fn paired(mode: Mode, other: Mode) -> u8 {
+    match (mode, other) {
+        (Mode::Fast, Mode::Fast) => 3,
+        _ => 0,
+    }
+}
+
+fn wrapped(mode: Option<Mode>) -> u8 {
+    match mode {
+        Some(Mode::Fast) => 3,
+        _ => 0,
+    }
+}

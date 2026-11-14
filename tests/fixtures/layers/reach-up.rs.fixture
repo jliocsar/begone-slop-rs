@@ -1,0 +1,17 @@
+//@ path: src/proto.rs
+//! The pure protocol layer, which must not reach up into `conn`.
+
+use crate as root;
+use crate::Socket;
+
+fn direct() {
+    crate::conn::Socket::open(); //~ layers
+}
+
+fn through_root_reexport() {
+    Socket::open();
+}
+
+fn through_alias() {
+    root::conn::Socket::open();
+}

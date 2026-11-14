@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use crate::config::Config;
 use crate::module_paths::normalize;
 use crate::rules::{self, Context, FileContext, Finding, Role};
-use crate::source::Source;
+use crate::source::{Edit, Source};
 use crate::{files, tree};
 
 /// Each fix pass can expose another (a removed blank line changes a neighbour's gap), but
@@ -26,9 +26,22 @@ pub enum Mode {
 /// Why a file couldn't be checked.
 #[derive(Debug)]
 pub enum CheckError {
-    Read { path: PathBuf, cause: io::Error },
-    Parse { path: PathBuf, cause: syn::Error },
-    Write { path: PathBuf, cause: io::Error },
+    Read {
+        path: PathBuf,
+        cause: io::Error,
+    },
+    Parse {
+        path: PathBuf,
+        cause: syn::Error,
+    },
+    Write {
+        path: PathBuf,
+        cause: io::Error,
+    },
+    /// `--fix` still had edits to make after its last pass; the file is left as it was.
+    FixDidNotSettle {
+        path: PathBuf,
+    },
 }
 
 /// What a run knows about the project: its `bs.toml`, every Rust file it lists, and what kind
@@ -65,6 +78,11 @@ impl fmt::Display for CheckError {
             Self::Write { path, cause } => {
                 write!(formatter, "can't write {}: {cause}", path.display())
             }
+            Self::FixDidNotSettle { path } => write!(
+                formatter,
+                "{}: the fixes didn't settle after {MAX_FIX_PASSES} passes (two of them keep undoing each other), so the file was left as it was; please report this",
+                path.display()
+            ),
         }
     }
 }
@@ -129,7 +147,8 @@ impl Project {
 ///
 /// # Errors
 ///
-/// Fails when the file can't be read, parsed or written back.
+/// Fails when the file can't be read, parsed or written back, or when its fixes don't settle
+/// (then it isn't written).
 pub fn check_file(path: &Path, mode: Mode, project: &Project) -> Result<FileReport, CheckError> {
     let text = fs::read_to_string(path).map_err(|cause| CheckError::Read {
         path: path.to_owned(),
@@ -137,32 +156,19 @@ pub fn check_file(path: &Path, mode: Mode, project: &Project) -> Result<FileRepo
     })?;
     let mut source = Source::new(path.to_owned(), &text);
     let context = project.context(path);
-    let mut findings = findings_in(&source, &context)?;
-    let found = findings.len();
+    let first = findings_in(&source, &context)?;
+    let found = first.len();
 
-    if mode == Mode::Fix {
-        for _ in 0..MAX_FIX_PASSES {
-            let edits: Vec<_> = findings
-                .iter()
-                .filter_map(|finding| finding.edit.clone())
-                .collect();
+    let findings = match mode {
+        Mode::Report => first,
+        Mode::Fix => settle(&mut source, &context)?,
+    };
 
-            if edits.is_empty() {
-                break;
-            }
-
-            source.apply(&edits);
-            findings = findings_in(&source, &context)?;
-        }
-
-        let fixed_text = source.text();
-
-        if fixed_text != text {
-            fs::write(path, fixed_text).map_err(|cause| CheckError::Write {
-                path: path.to_owned(),
-                cause,
-            })?;
-        }
+    if mode == Mode::Fix && source.text() != text {
+        fs::write(path, source.text()).map_err(|cause| CheckError::Write {
+            path: path.to_owned(),
+            cause,
+        })?;
     }
 
     let fixed = found.saturating_sub(findings.len());
@@ -172,6 +178,18 @@ pub fn check_file(path: &Path, mode: Mode, project: &Project) -> Result<FileRepo
         findings,
         fixed,
     })
+}
+
+/// Applies the fixable findings' edits to `source`, pass after pass, until no finding has an
+/// edit left; returns what's still wrong. Nothing touches the disk.
+///
+/// # Errors
+///
+/// Fails when syn can't parse the source, or when the edits haven't settled after
+/// `MAX_FIX_PASSES` passes: two fixes that keep undoing each other would otherwise leave a
+/// half-fixed file that looks finished.
+pub fn settle(source: &mut Source, context: &Context) -> Result<Vec<Finding>, CheckError> {
+    settle_within(source, context, MAX_FIX_PASSES)
 }
 
 /// The syntax rules' findings for a source, without touching the disk.
@@ -188,4 +206,80 @@ pub fn findings_in(source: &Source, context: &Context) -> Result<Vec<Finding>, C
     proc_macro2::extra::invalidate_current_thread_spans();
 
     Ok(findings)
+}
+
+fn settle_within(
+    source: &mut Source,
+    context: &Context,
+    passes: usize,
+) -> Result<Vec<Finding>, CheckError> {
+    for _ in 0..passes {
+        let findings = findings_in(source, context)?;
+        let edits: Vec<Edit> = findings
+            .iter()
+            .filter_map(|finding| finding.edit.clone())
+            .collect();
+
+        if edits.is_empty() {
+            return Ok(findings);
+        }
+
+        source.apply(&edits);
+    }
+
+    let findings = findings_in(source, context)?;
+
+    if findings.iter().any(|finding| finding.edit.is_some()) {
+        return Err(CheckError::FixDidNotSettle {
+            path: source.path.clone(),
+        });
+    }
+
+    Ok(findings)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+    use std::path::{Path, PathBuf};
+
+    use super::{CheckError, settle_within};
+    use crate::config::Config;
+    use crate::rules::{Context, Role};
+    use crate::source::Source;
+
+    const UNPADDED: &str = "//! Sample.\n\nfn run() {\n    let ready = true;\n    if ready {\n        go();\n    }\n    done();\n}\n";
+
+    fn settled(passes: usize) -> Result<String, CheckError> {
+        let config = Config::default();
+        let listed = HashSet::new();
+        let context = Context {
+            config: &config,
+            role: Role::Library,
+            absolute: PathBuf::from("/project/src/sample.rs"),
+            relative: Some(PathBuf::from("src/sample.rs")),
+            listed: &listed,
+        };
+        let mut source = Source::new("src/sample.rs".into(), UNPADDED);
+
+        settle_within(&mut source, &context, passes).map(|_| source.text())
+    }
+
+    #[test]
+    fn fixes_settle_within_the_passes() {
+        let fixed = settled(8).unwrap();
+
+        assert_eq!(
+            fixed,
+            "//! Sample.\n\nfn run() {\n    let ready = true;\n\n    if ready {\n        go();\n    }\n\n    done();\n}\n"
+        );
+    }
+
+    #[test]
+    fn fixes_left_after_the_last_pass_are_an_error() {
+        assert!(matches!(
+            settled(0),
+            Err(CheckError::FixDidNotSettle { path }) if path == Path::new("src/sample.rs")
+        ));
+    }
 }

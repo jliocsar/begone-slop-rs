@@ -1,0 +1,6 @@
+//! Smuggled waiver.
+
+const NOTE: &str = "bs-allow(no-boolean-trap): smuggled";
+fn six(flag: bool) -> u8 { u8::from(flag) } //~ no-boolean-trap, padding
+
+fn seven(flag: bool) -> u8 { u8::from(flag) } // bs-allow(no-boolean-trap): x //~ no-boolean-trap, waiver-needs-reason

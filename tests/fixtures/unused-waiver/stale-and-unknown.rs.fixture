@@ -1,0 +1,14 @@
+//! Waivers that waive nothing: a typo, a fixed finding, one a line too far.
+
+// bs-allow(no-boolen-trap): the C API this mirrors takes a flag //~ unknown-waiver
+fn draw(filled: bool) {} //~ no-boolean-trap
+
+// bs-allow(no-boolean-trap): the C API this mirrors takes a flag //~ unused-waiver
+fn fill(fill: Fill) {}
+
+// bs-allow(no-boolean-trap): the C API this mirrors takes a flag //~ unused-waiver
+
+fn shade(solid: bool) {} //~ no-boolean-trap
+
+// bs-allow(no-boolean-trap): the C API this mirrors takes a flag
+fn outline(thick: bool) {}

@@ -1,0 +1,4 @@
+/// Doc for one. //~ module-doc
+// ast-grep-ignore: no-string-error -- legacy code kept as is
+#[inline]
+fn one() -> Result<u8, String> { todo() }

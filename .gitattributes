@@ -1,0 +1,2 @@
+# Fixtures are Rust files the gate mustn't lint; show them as Rust anyway.
+*.rs.fixture linguist-language=Rust

@@ -1,0 +1,6 @@
+//! Production code in a checkout that happens to live under a `tests` directory.
+
+#[expect(clippy::unwrap_used, reason = "fine")] //~ no-forbidden-expects
+fn load(session_id: String, verbose: bool) -> u8 { //~ newtype-ids, no-boolean-trap
+    std::fs::read_to_string("x").unwrap().len() as u8
+}

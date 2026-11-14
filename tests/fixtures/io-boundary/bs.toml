@@ -1,0 +1,3 @@
+[io]
+allowed = ["src/shell.rs"]
+effects = ["uuid"]
