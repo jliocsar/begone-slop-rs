@@ -3,7 +3,9 @@ valid:
   - 'fn run(mode: Mode) { match mode { Mode::Fast => go(), Mode::Slow => wait() } }'
   - 'impl FromStr for Mode { fn from_str(text: &str) -> Result<Self, Self::Err> { match text { "fast" => Ok(Mode::Fast), _ => Err(Unknown) } } }'
   - 'fn parse(argument: &str) -> Flag { match argument { "--fix" => Flag::Fix, _ => Flag::Other } }'
+  - 'fn decode(name: &str, payload: &Value) -> Event { match name { "bell" => Event::Bell, _ => Event::Other } }'
   - 'fn kind(tree: &Tree) -> Kind { match tree { Tree::Name(name) if name.ident == "self" => Kind::Own, _ => Kind::Other } }'
 invalid:
+  - 'fn encoded(name: &str) -> bool { match name { "bell" => true, _ => false } }'
   - 'fn run(mode: &str) { match mode { "fast" => go(), _ => wait() } }'
   - 'fn run(mode: String) { match mode.as_str() { "fast" | "quick" => go(), _ => wait() } }'
