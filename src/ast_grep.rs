@@ -8,14 +8,10 @@ use std::process::Command;
 use crate::check::Mode;
 
 /// The files in `rules/`, by id. A test keeps this list and the directory equal.
-pub const RULES: [(&str, &str); 15] = [
+pub const RULES: [(&str, &str); 13] = [
     (
         "error-message-style",
         include_str!("../rules/error-message-style.yml"),
-    ),
-    (
-        "ignore-needs-reason",
-        include_str!("../rules/ignore-needs-reason.yml"),
     ),
     (
         "no-box-dyn-error",
@@ -61,10 +57,6 @@ pub const RULES: [(&str, &str); 15] = [
     (
         "todo-needs-issue",
         include_str!("../rules/todo-needs-issue.yml"),
-    ),
-    (
-        "waiver-needs-reason",
-        include_str!("../rules/waiver-needs-reason.yml"),
     ),
 ];
 

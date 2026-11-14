@@ -23,6 +23,7 @@ mod test_hygiene;
 mod test_scope;
 mod unit;
 mod use_groups;
+mod waivers;
 
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
@@ -59,6 +60,7 @@ pub enum Rule {
     TestMustAssert,
     TestName,
     UseGroups,
+    WaiverNeedsReason,
 }
 
 impl Rule {
@@ -91,18 +93,59 @@ impl Rule {
             Self::TestMustAssert => "test-must-assert",
             Self::TestName => "test-name",
             Self::UseGroups => "use-groups",
+            Self::WaiverNeedsReason => "waiver-needs-reason",
         }
+    }
+
+    /// The rule called `name`, the way `bs-allow(<name>)` writes it.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|rule| rule.name() == name)
     }
 }
 
 impl Rule {
+    /// Every rule, in the order of the enum.
+    pub const ALL: [Self; 27] = [
+        Self::AssertPadding,
+        Self::Complexity,
+        Self::IoBoundary,
+        Self::Layers,
+        Self::ModuleDoc,
+        Self::NewtypeIds,
+        Self::NoAbbreviations,
+        Self::NoBlockingInAsync,
+        Self::NoBooleanTrap,
+        Self::NoCommentedOutCode,
+        Self::NoCrateLevelAllow,
+        Self::NoForbiddenExpects,
+        Self::NoHiddenCode,
+        Self::NoJunkDrawerModules,
+        Self::NoMutableAccumulator,
+        Self::NoNumberedNames,
+        Self::NoSleepInTests,
+        Self::NoStringlyFields,
+        Self::NoTypeInName,
+        Self::NoWildcardOnLocalEnum,
+        Self::Padding,
+        Self::PreferMatch,
+        Self::ReexportOnly,
+        Self::TestMustAssert,
+        Self::TestName,
+        Self::UseGroups,
+        Self::WaiverNeedsReason,
+    ];
+
     /// Whether a `bs-allow` comment can waive the rule. The rules that guard the gate itself
     /// can't be waived: a waiver there is the bypass they exist to stop.
     #[must_use]
     pub const fn is_waivable(self) -> bool {
         !matches!(
             self,
-            Self::NoCrateLevelAllow | Self::NoForbiddenExpects | Self::NoHiddenCode
+            Self::NoCrateLevelAllow
+                | Self::NoForbiddenExpects
+                | Self::NoHiddenCode
+                | Self::WaiverNeedsReason
         )
     }
 }
@@ -221,6 +264,7 @@ pub fn run(source: &Source, file: &syn::File, context: &Context) -> Vec<Finding>
     findings.extend(exhaustive::check(file, context));
     findings.extend(async_blocking::check(file));
     findings.extend(hidden_code::check(file, context));
+    findings.extend(waivers::check(source));
     findings.retain(|finding| {
         !finding.rule.is_waivable() || !source.waives(finding.line, finding.rule.name())
     });

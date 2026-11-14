@@ -1,5 +1,0 @@
-id: ignore-needs-reason
-valid:
-  - "#[test]\n#[ignore = \"needs a running server\"]\nfn connects() {}"
-invalid:
-  - "#[test]\n#[ignore]\nfn connects() {}"

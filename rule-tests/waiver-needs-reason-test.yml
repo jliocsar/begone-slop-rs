@@ -1,7 +1,0 @@
-id: waiver-needs-reason
-valid:
-  - "fn run() {\n    // ast-grep-ignore: no-catch-unwind -- the FFI boundary must not unwind\n    guard(work);\n}"
-  - "fn run() {\n    // ast-grep-ignore: no-catch-unwind, no-untyped-json -- both are the wire's\n    guard(work);\n}"
-invalid:
-  - "fn run() {\n    // ast-grep-ignore\n    guard(work);\n}"
-  - "fn run() {\n    // ast-grep-ignore: no-catch-unwind\n    guard(work);\n}"

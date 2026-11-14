@@ -79,8 +79,17 @@ in, so running it from a member crate checks the same thing. There's no waiver f
 - `no-hidden-code`: `#[path = "core.inc"] mod core;` and `include!("more.in")` compile code that
   no rule reads, and so does either one pointing at a `.rs` file git doesn't list. Only Cargo's
   generated-code idiom, `include!(concat!(env!("OUT_DIR"), ...))`, passes.
-- `waiver-needs-reason`: an `ast-grep-ignore` names its rules and says why:
-  `// ast-grep-ignore: no-catch-unwind -- the FFI boundary must not unwind`.
+- `waiver-needs-reason`: a waiver names what it waives and says why, in a sentence (3 words or
+  more). A `bs-allow` only counts in a plain `//` comment, not in a string, a doc comment or a
+  block comment, and naming a gate rule, an unknown rule or a pattern rule is a finding. ast-grep
+  honours any comment that opens with `ast-grep-ignore`, so the only one that passes is a plain
+  `//` comment on its own line, right above the code it waives, naming pattern rules and a
+  reason: `// ast-grep-ignore: no-catch-unwind -- the FFI boundary must not unwind`. A bare one
+  (it waives every rule), one in a `/* */` or doc comment, one after code on its line, and one
+  above a blank line (on line 1, that waives the whole file) all fail. This is a syntax rule, not
+  a pattern rule, so ast-grep can't waive it.
+
+None of these rules can be waived.
 
 ## Boundaries: `bs.toml`
 
@@ -204,7 +213,9 @@ fields, types, variants and constants. Names used from other crates, and methods
 are left alone. Words the language itself uses, like `str`, `len`, `args` and `fmt`, aren't on the
 list. Neither are domain words like `expr` or `stmt`.
 
-Waive a finding with a comment on its line or the line above. The reason is required:
+Waive a finding with a plain `//` comment on its line or the line above. The reason is required,
+and it's a sentence of 3 words or more (`fine` doesn't count). The gate rules above can't be
+waived:
 
 ```rust
 // bs-allow(complexity): one arm per key name reads better than any split
@@ -224,14 +235,14 @@ fn key_name(key: Key) -> &'static str {
 | `no-stringly-match`    | string-literal match arms outside a parse (`FromStr`, `TryFrom`, `parse*`, `from_*`) |
 | `no-swallowed-parse`   | `.parse().unwrap_or(…)` and friends: bad input becomes a default  |
 | `todo-needs-issue`     | `TODO`/`FIXME`/`XXX`/`HACK` without `(ABC-123)`, `(#12)` or a URL |
-| `ignore-needs-reason`  | a bare `#[ignore]`; write `#[ignore = "why"]`                      |
-| `waiver-needs-reason`  | an `ast-grep-ignore` without rule ids and a ` -- reason`          |
 | `no-global-state`      | a `static mut`, or a `static` holding a `Mutex`, `RefCell`, `Cell` or atomic |
 | `no-detached-tasks`    | `tokio::spawn(..)` / `thread::spawn(..)` with the handle dropped |
 | `error-message-style`  | `#[error("Capitalised.")]`: lowercase, no trailing period (C-GOOD-ERR) |
 | `no-rc-refcell`        | `Rc<RefCell<_>>` and `Rc<Cell<_>>`: give the state one owner      |
 
-Waive one with ast-grep's own `// ast-grep-ignore: <rule>` comment, and a reason next to it. The
+A bare `#[ignore]` is clippy's `ignore_without_reason`, which the preset turns on with the
+pedantic group. Waive a pattern rule with ast-grep's own comment, on its own line above the code:
+`// ast-grep-ignore: <rule> -- <reason>` (`waiver-needs-reason` checks its form). The
 rule files live in [`rules/`](rules), with tests in [`rule-tests/`](rule-tests). `sgconfig.yml`
 points the ast-grep CLI and its editor language server at them.
 

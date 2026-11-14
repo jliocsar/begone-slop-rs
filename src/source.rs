@@ -1,7 +1,11 @@
-//! A source file as lines, which is what the padding rules read and their fixes rewrite.
+//! A source file as lines, which is what the padding rules read and their fixes rewrite, plus
+//! its comments, which syn throws away.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
+
+/// A waiver's reason is a sentence: at least this many words.
+pub const MIN_REASON_WORDS: usize = 3;
 
 /// A line-based change one finding asks for. Lines are 1-based, as spans and editors count.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -16,12 +20,41 @@ pub enum Edit {
     },
 }
 
+/// How a comment opens: `//`, `/*`, or a doc comment (`///`, `//!`, `/**`, `/*!`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CommentKind {
+    Block,
+    Doc,
+    Line,
+}
+
+/// One comment: the line it starts on, its kind, its text without the markers, and whether
+/// code comes before it on that line.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Comment {
+    pub line: usize,
+    pub kind: CommentKind,
+    pub text: String,
+    pub after_code: bool,
+}
+
 /// A Rust source file, split into lines.
 pub struct Source {
     pub path: PathBuf,
     pub lines: Vec<String>,
+    pub comments: Vec<Comment>,
     line_break: &'static str,
     trailing_newline: bool,
+}
+
+/// Walks source text one character at a time, keeping the line count, so comments are told
+/// apart from string and character literals that look like them.
+struct Lexer {
+    characters: Vec<char>,
+    at: usize,
+    line: usize,
+    line_has_code: bool,
+    comments: Vec<Comment>,
 }
 
 impl Source {
@@ -32,6 +65,7 @@ impl Source {
         Self {
             path,
             lines: text.lines().map(str::to_owned).collect(),
+            comments: Lexer::comments(text),
             line_break,
             trailing_newline: text.ends_with('\n'),
         }
@@ -61,18 +95,23 @@ impl Source {
         self.line(number).is_none_or(|text| text.trim().is_empty())
     }
 
-    /// `// bs-allow(<rule>): <reason>` on a finding's line or the line above waives it.
-    /// The reason is required: a waiver nobody explained is slop too.
+    /// `// bs-allow(<rule>): <reason>` on a finding's line or the line above waives it. Only a
+    /// plain `//` comment that opens with the marker counts (not a string that contains it),
+    /// and the reason has to be a sentence: a waiver nobody explained is slop too.
     #[must_use]
     pub fn waives(&self, number: usize, rule: &str) -> bool {
         let marker = format!("bs-allow({rule}):");
 
-        [number.saturating_sub(1), number]
-            .into_iter()
-            .filter_map(|candidate| self.line(candidate))
-            .any(|text| {
-                text.split_once(&marker)
-                    .is_some_and(|(_, reason)| !reason.trim().is_empty())
+        self.comments
+            .iter()
+            .filter(|comment| comment.kind == CommentKind::Line)
+            .filter(|comment| comment.line == number || comment.line + 1 == number)
+            .any(|comment| {
+                comment
+                    .text
+                    .trim_start()
+                    .strip_prefix(&marker)
+                    .is_some_and(is_real_reason)
             })
     }
 
@@ -108,9 +147,249 @@ impl Source {
     }
 }
 
+impl Lexer {
+    fn comments(text: &str) -> Vec<Comment> {
+        let mut lexer = Self {
+            characters: text.chars().collect(),
+            at: 0,
+            line: 1,
+            line_has_code: false,
+            comments: Vec::new(),
+        };
+
+        while let Some(character) = lexer.peek(0) {
+            match (character, lexer.peek(1)) {
+                ('/', Some('/')) => lexer.line_comment(),
+                ('/', Some('*')) => lexer.block_comment(),
+                ('"', _) => lexer.string(),
+                ('\'', _) => lexer.quote(),
+                _ if character.is_alphabetic() || character == '_' => lexer.word(),
+                _ => {
+                    lexer.code(character);
+                    lexer.at += 1;
+                }
+            }
+        }
+
+        lexer.comments
+    }
+
+    fn peek(&self, ahead: usize) -> Option<char> {
+        self.characters.get(self.at + ahead).copied()
+    }
+
+    /// Steps over one character that isn't in a comment.
+    fn code(&mut self, character: char) {
+        if character == '\n' {
+            self.line += 1;
+            self.line_has_code = false;
+        } else if !character.is_whitespace() {
+            self.line_has_code = true;
+        }
+    }
+
+    fn text_until(&self, end: usize) -> String {
+        self.characters
+            .get(self.at..end)
+            .unwrap_or_default()
+            .iter()
+            .collect()
+    }
+
+    fn line_comment(&mut self) {
+        self.at += 2;
+        let end = (self.at..self.characters.len())
+            .find(|index| self.characters.get(*index) == Some(&'\n'))
+            .unwrap_or(self.characters.len());
+        let body = self.text_until(end);
+        let doc = (body.starts_with('/') && !body.starts_with("//")) || body.starts_with('!');
+
+        self.comments.push(Comment {
+            line: self.line,
+            kind: if doc {
+                CommentKind::Doc
+            } else {
+                CommentKind::Line
+            },
+            text: if doc {
+                body.get(1..).unwrap_or_default().to_owned()
+            } else {
+                body
+            },
+            after_code: self.line_has_code,
+        });
+        self.at = end;
+    }
+
+    fn block_comment(&mut self) {
+        let line = self.line;
+        let after_code = self.line_has_code;
+        self.at += 2;
+        let doc = matches!(
+            (self.peek(0), self.peek(1)),
+            (Some('*'), Some(next)) if next != '*' && next != '/'
+        ) || self.peek(0) == Some('!');
+        let start = self.at;
+        let mut depth = 1;
+
+        while depth > 0
+            && let Some(character) = self.peek(0)
+        {
+            match (character, self.peek(1)) {
+                ('*', Some('/')) => {
+                    depth -= 1;
+                    self.at += 2;
+                }
+                ('/', Some('*')) => {
+                    depth += 1;
+                    self.at += 2;
+                }
+                _ => {
+                    self.line += usize::from(character == '\n');
+                    self.at += 1;
+                }
+            }
+        }
+
+        let end = self.at.saturating_sub(2).max(start);
+
+        self.comments.push(Comment {
+            line,
+            kind: if doc {
+                CommentKind::Doc
+            } else {
+                CommentKind::Block
+            },
+            text: self
+                .characters
+                .get(start..end)
+                .unwrap_or_default()
+                .iter()
+                .collect(),
+            after_code,
+        });
+    }
+
+    /// A `"..."` string, escapes included.
+    fn string(&mut self) {
+        self.line_has_code = true;
+        self.at += 1;
+
+        while let Some(character) = self.peek(0) {
+            self.at += 1;
+
+            match character {
+                '\\' => {
+                    self.line += usize::from(self.peek(0) == Some('\n'));
+                    self.at += 1;
+                }
+                '"' => return,
+                '\n' => self.line += 1,
+                _ => {}
+            }
+        }
+    }
+
+    /// `r"..."`, `r#"..."#` and their `b`/`c` forms, from the opening quote.
+    fn raw_string(&mut self) {
+        let hashes = self.hashes_from(0);
+        self.at += hashes + 1;
+
+        while let Some(character) = self.peek(0) {
+            self.at += 1;
+            self.line += usize::from(character == '\n');
+
+            if character == '"' && (0..hashes).all(|ahead| self.peek(ahead) == Some('#')) {
+                self.at += hashes;
+
+                return;
+            }
+        }
+    }
+
+    /// A character literal (`'x'`, `'\n'`), or a lifetime or label (`'a`), which has no end.
+    fn quote(&mut self) {
+        self.line_has_code = true;
+
+        if self.peek(1) == Some('\\') {
+            self.at += 2;
+
+            while let Some(character) = self.peek(0) {
+                self.at += 1;
+
+                if character == '\'' {
+                    return;
+                }
+            }
+        } else if self.peek(2) == Some('\'') {
+            self.at += 3;
+        } else {
+            self.at += 1;
+        }
+    }
+
+    /// An identifier or keyword, which may open a raw string (`r"`, `br#"`) or a byte or C
+    /// string (`b"`, `c"`, `b'x'`).
+    fn word(&mut self) {
+        self.line_has_code = true;
+        let start = self.at;
+
+        while self
+            .peek(0)
+            .is_some_and(|character| character.is_alphanumeric() || character == '_')
+        {
+            self.at += 1;
+        }
+
+        let word = self.text_until_from(start);
+        let raw = matches!(word.as_str(), "r" | "br" | "cr");
+        let opens_raw = raw
+            && match self.peek(0) {
+                Some('"') => true,
+                Some('#') => self.peek(self.hashes_from(0)) == Some('"'),
+                _ => false,
+            };
+
+        if opens_raw {
+            self.raw_string();
+        } else if matches!(word.as_str(), "b" | "c") && self.peek(0) == Some('"') {
+            self.string();
+        } else if word == "b" && self.peek(0) == Some('\'') {
+            self.quote();
+        }
+    }
+
+    /// How many `#` follow, starting `ahead` characters on.
+    fn hashes_from(&self, ahead: usize) -> usize {
+        self.characters
+            .iter()
+            .skip(self.at + ahead)
+            .take_while(|character| **character == '#')
+            .count()
+    }
+
+    fn text_until_from(&self, start: usize) -> String {
+        self.characters
+            .get(start..self.at)
+            .unwrap_or_default()
+            .iter()
+            .collect()
+    }
+}
+
+/// A waiver's reason is a sentence: [`MIN_REASON_WORDS`] words or more, not `x` or `fine`.
+#[must_use]
+pub fn is_real_reason(reason: &str) -> bool {
+    reason
+        .split_whitespace()
+        .filter(|word| word.chars().any(char::is_alphabetic))
+        .count()
+        >= MIN_REASON_WORDS
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Edit, Source};
+    use super::{CommentKind, Edit, Source};
 
     fn source(text: &str) -> Source {
         Source::new("sample.rs".into(), text)
@@ -124,6 +403,41 @@ mod tests {
         assert!(sample.waives(2, "complexity"));
         assert!(!sample.waives(4, "complexity"));
         assert!(!sample.waives(2, "padding"));
+    }
+
+    #[test]
+    fn a_marker_in_a_string_isnt_a_waiver() {
+        let text = "const NOTE: &str = \"bs-allow(no-boolean-trap): see the docs for this\";\nfn draw(filled: bool) {}\n";
+        let sample = source(text);
+
+        assert!(!sample.waives(2, "no-boolean-trap"));
+    }
+
+    #[test]
+    fn a_one_word_reason_doesnt_count() {
+        let sample = source("// bs-allow(complexity): fine\nfn parse() {}\n");
+
+        assert!(!sample.waives(2, "complexity"));
+    }
+
+    #[test]
+    fn comments_are_told_apart_from_literals() {
+        let text = "let url = \"http://x\"; // trailing\nlet raw = r#\"/* not */ \"//\"#;\nlet quote = '\"'; /* block\nspans */\n/// doc\nfn tick<'a>(x: &'a str) {} // last\n";
+        let found: Vec<(usize, CommentKind, String, bool)> = source(text)
+            .comments
+            .into_iter()
+            .map(|comment| (comment.line, comment.kind, comment.text, comment.after_code))
+            .collect();
+
+        assert_eq!(
+            found,
+            [
+                (1, CommentKind::Line, " trailing".to_owned(), true),
+                (3, CommentKind::Block, " block\nspans ".to_owned(), true),
+                (5, CommentKind::Doc, " doc".to_owned(), false),
+                (6, CommentKind::Line, " last".to_owned(), true),
+            ]
+        );
     }
 
     #[test]
