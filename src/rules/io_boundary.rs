@@ -2,12 +2,16 @@
 //!
 //! Functional core, imperative shell, enforced: the file system, network, processes,
 //! environment, stdio, clock, randomness and signals are reached only from the shell. An
-//! effect is spotted where it's imported, or where a full path names it in code. Test code
-//! is exempt: a test may build its own fixtures on disk.
+//! effect is spotted where it's imported, or where a full path names it in code. `Path`'s
+//! own file-system methods (`.exists()`, `.canonicalize()`, `.read_dir()`, ...) are effects
+//! too, wherever they're called: the receiver's type isn't known here, so any call by those
+//! names counts, except `.is_file()`/`.is_dir()`/`.is_symlink()` on what `metadata()` or
+//! `file_type()` returned, which only reads a value. Test code is exempt: a test may build
+//! its own fixtures on disk.
 
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{ItemUse, Macro};
+use syn::{Expr, ExprMethodCall, ItemUse, Macro};
 
 use super::paths::{UseLeaf, is_pure, macro_arguments, segments, starts_with, use_leaves};
 use super::{FileContext, Finding, Rule};
@@ -46,6 +50,29 @@ const EFFECTS: [(&str, &str); 28] = [
 
 const PRINT_MACROS: [&str; 5] = ["dbg", "eprint", "eprintln", "print", "println"];
 
+/// `Path` and `PathBuf` methods that ask the file system.
+const FILE_SYSTEM_METHODS: [&str; 10] = [
+    "canonicalize",
+    "exists",
+    "is_dir",
+    "is_file",
+    "is_symlink",
+    "metadata",
+    "read_dir",
+    "read_link",
+    "symlink_metadata",
+    "try_exists",
+];
+
+/// Methods also on `fs::FileType` and `fs::Metadata`, where they read a value already fetched.
+const KIND_METHODS: [&str; 3] = ["is_dir", "is_file", "is_symlink"];
+
+/// Calls that fetch a `FileType` or `Metadata`.
+const KIND_SOURCES: [&str; 3] = ["file_type", "metadata", "symlink_metadata"];
+
+/// Words in a binding's name that say it holds a `FileType` or `Metadata`.
+const KIND_NAMES: [&str; 3] = ["kind", "meta", "type"];
+
 struct IoCheck<'run> {
     file: &'run FileContext<'run>,
     boundary: &'run IoBoundary,
@@ -61,7 +88,8 @@ impl IoCheck<'_> {
         let built_in = EFFECTS
             .iter()
             .find(|(prefix, _)| starts_with(full, prefix))
-            .map(|(_, effect)| (*effect).to_owned());
+            .map(|(_, effect)| (*effect).to_owned())
+            .or_else(|| is_path_method(full).then(|| "the file system".to_owned()));
 
         built_in.or_else(|| {
             self.boundary
@@ -95,6 +123,21 @@ impl IoCheck<'_> {
 }
 
 impl<'ast> Visit<'ast> for IoCheck<'_> {
+    fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
+        let method = call.method.to_string();
+        let reads_a_kind = KIND_METHODS.contains(&method.as_str()) && fetches_kind(&call.receiver);
+
+        if FILE_SYSTEM_METHODS.contains(&method.as_str()) && !reads_a_kind {
+            self.report(
+                call.method.span().start().line,
+                &format!(".{method}()"),
+                "the file system",
+            );
+        }
+
+        visit::visit_expr_method_call(self, call);
+    }
+
     fn visit_item_use(&mut self, import: &'ast ItemUse) {
         for leaf in use_leaves(&import.tree) {
             self.check_leaf(&leaf);
@@ -148,6 +191,33 @@ impl<'ast> Visit<'ast> for IoCheck<'_> {
         }
 
         visit::visit_path(self, path);
+    }
+}
+
+/// `std::path::Path::exists` and the like, written as a path (`Path::exists(&file)`).
+fn is_path_method(full: &[String]) -> bool {
+    matches!(full, [std, path, owner, method]
+        if std == "std"
+            && path == "path"
+            && (owner == "Path" || owner == "PathBuf")
+            && FILE_SYSTEM_METHODS.contains(&method.as_str()))
+}
+
+/// Whether `receiver` reads as a `FileType` or `Metadata`: one just fetched
+/// (`entry.file_type()?`, `path.metadata()`), or a binding named for one (`kind`,
+/// `file_type`, `metadata`).
+fn fetches_kind(receiver: &Expr) -> bool {
+    match receiver {
+        Expr::Try(inner) => fetches_kind(&inner.expr),
+        Expr::Paren(inner) => fetches_kind(&inner.expr),
+        Expr::Reference(inner) => fetches_kind(&inner.expr),
+        Expr::MethodCall(call) => KIND_SOURCES.iter().any(|name| call.method == name),
+        Expr::Path(binding) => binding.path.get_ident().is_some_and(|name| {
+            let name = name.to_string();
+
+            KIND_NAMES.iter().any(|kind| name.contains(kind))
+        }),
+        _ => false,
     }
 }
 
@@ -276,5 +346,19 @@ mod tests {
 
         assert_eq!(io_lines_in("src/shell.rs", text), NONE);
         assert_eq!(io_lines_in("src/core.rs", text), [1]);
+    }
+
+    #[test]
+    fn path_methods_that_ask_the_disk_are_reported() {
+        let text = "use std::path::Path;\n\nfn find(path: &Path) -> bool {\n    let real = path.canonicalize();\n    path.exists()\n        && Path::is_dir(path)\n        && path.metadata().is_ok_and(|meta| meta.is_file())\n}\n";
+
+        assert_eq!(io_lines(text), [4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn reading_a_fetched_kind_isnt_another_effect() {
+        let text = "fn kind(entry: &DirEntry) -> bool {\n    entry.file_type().is_ok_and(|kind| kind.is_dir())\n}\n\nfn shell(entry: &DirEntry) -> io::Result<bool> {\n    Ok(entry.file_type()?.is_dir())\n}\n";
+
+        assert_eq!(io_lines(text), NONE);
     }
 }
