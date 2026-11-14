@@ -1,0 +1,8 @@
+//@ path: tests/wire.rs
+//! An integration test builds the wire messages it feeds the parser.
+
+use serde_json::{Value, json};
+
+fn hello() -> Value {
+    json!({ "type": "hello" })
+}

@@ -1,0 +1,8 @@
+//@ path: src/wire/tests.rs
+//! A unit test module builds the wire messages it feeds the parser.
+
+use serde_json::{Value, json};
+
+fn hello() -> Value {
+    json!({ "type": "hello" })
+}
