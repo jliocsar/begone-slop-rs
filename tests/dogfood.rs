@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use cargo_bs::check::{self, Mode};
+use cargo_bs::check::{self, Mode, Project};
 use cargo_bs::config::Config;
 use cargo_bs::files;
 
@@ -14,12 +14,12 @@ fn this_repo_passes_its_own_rules() {
         .iter()
         .map(|name| root.join(name))
         .collect();
-    let config = Config::load(root).unwrap();
-    let problems: Vec<String> = files::rust_files(&roots)
-        .unwrap()
+    let paths = files::rust_files(&roots).unwrap();
+    let project = Project::new(Config::load(root).unwrap(), &paths).unwrap();
+    let problems: Vec<String> = paths
         .iter()
         .flat_map(|path| {
-            let report = check::check_file(path, Mode::Report, &config).unwrap();
+            let report = check::check_file(path, Mode::Report, &project).unwrap();
 
             report.findings.into_iter().map(move |finding| {
                 format!("{}:{}: {}", path.display(), finding.line, finding.message)

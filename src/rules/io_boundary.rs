@@ -13,8 +13,8 @@ use syn::visit::{self, Visit};
 use syn::{File, ItemFn, ItemMod, ItemUse, Macro};
 
 use super::paths::{UseLeaf, file_imports, segments, starts_with, use_leaves};
-use super::test_scope::{is_test_fn, is_test_module, is_test_path};
-use super::{Finding, Rule};
+use super::test_scope::{is_test_fn, is_test_module};
+use super::{Context, Finding, Rule};
 use crate::config::{Config, IoBoundary};
 use crate::source::Source;
 
@@ -172,7 +172,9 @@ fn is_allowed(config: &Config, boundary: &IoBoundary, path: &Path) -> bool {
     })
 }
 
-pub(super) fn check(source: &Source, file: &File, config: &Config) -> Vec<Finding> {
+pub(super) fn check(source: &Source, file: &File, context: &Context) -> Vec<Finding> {
+    let config = context.config;
+
     let Some(boundary) = &config.io else {
         return Vec::new();
     };
@@ -185,7 +187,7 @@ pub(super) fn check(source: &Source, file: &File, config: &Config) -> Vec<Findin
         boundary,
         imports: file_imports(file),
         findings: Vec::new(),
-        test_file: is_test_path(&source.path),
+        test_file: context.in_tests(),
         test_depth: 0,
     };
     io_check.visit_file(file);
@@ -196,11 +198,13 @@ pub(super) fn check(source: &Source, file: &File, config: &Config) -> Vec<Findin
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::path::PathBuf;
 
     use super::check;
     use crate::config::{Config, IoBoundary};
     use crate::rules::testing::NONE;
+    use crate::rules::{Context, Role};
     use crate::source::Source;
 
     fn io_lines(text: &str) -> Vec<usize> {
@@ -213,8 +217,15 @@ mod tests {
         };
         let source = Source::new("src/core.rs".into(), text);
         let file = syn::parse_file(text).unwrap();
+        let listed = HashSet::new();
+        let context = Context {
+            config: &config,
+            role: Role::Library,
+            absolute: PathBuf::from("/project/src/core.rs"),
+            listed: &listed,
+        };
 
-        check(&source, &file, &config)
+        check(&source, &file, &context)
             .iter()
             .map(|finding| finding.line)
             .collect()

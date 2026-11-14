@@ -3,20 +3,25 @@
 //! A `_ =>` arm (or a catch-all binding) swallows the variant someone adds next, and the
 //! compiler stays quiet. For an enum from another crate that's often required (it may be
 //! `#[non_exhaustive]`), which is why clippy's `wildcard_enum_match_arm` is too noisy to turn
-//! on. For an enum defined in the same file, there's no excuse. Guarded catch-alls
-//! (`_ if ... =>`) don't count, and neither do wildcards nested inside a tuple.
+//! on. For an enum defined in the same file, there's no excuse. A pattern names a local enum
+//! as `Enum::Variant`, `self::Enum::Variant` or `Self::Variant` inside its impl; a longer path
+//! (`style::Underline::None`) is another module's enum, even when this file defines one of the
+//! same name. Guarded catch-alls (`_ if ... =>`) don't count, wildcards nested inside a tuple
+//! don't either, and test code may pick out one variant with `_`.
 
 use std::collections::HashSet;
 
 use syn::visit::{self, Visit};
-use syn::{ExprMatch, File, ItemEnum, ItemImpl, Pat, Path, Type};
+use syn::{ExprMatch, File, ItemEnum, ItemFn, ItemImpl, ItemMod, Pat, Path, Type};
 
-use super::{Finding, Rule};
+use super::test_scope::Scope;
+use super::{Context, Finding, Rule};
 
 struct Exhaustive {
     enums: HashSet<String>,
     impl_self: Option<String>,
     findings: Vec<Finding>,
+    test_depth: usize,
 }
 
 #[derive(Default)]
@@ -25,17 +30,31 @@ struct LocalEnums {
 }
 
 impl Exhaustive {
-    /// The enum a pattern names: `Kind::Use` gives `Kind`, `Self::Use` the impl's type.
+    /// The local enum a pattern names: `Kind::Use` and `self::Kind::Use` give `Kind`,
+    /// `Self::Use` the impl's type. Any other path is another module's.
     fn enum_of(&self, path: &Path) -> Option<String> {
-        let mut segments = path.segments.iter().rev();
-        segments.next()?;
-        let owner = segments.next()?.ident.to_string();
+        let names: Vec<String> = path
+            .segments
+            .iter()
+            .map(|segment| segment.ident.to_string())
+            .collect();
 
-        if owner == "Self" {
-            self.impl_self.clone()
-        } else {
-            Some(owner)
+        if path.leading_colon.is_some() {
+            return None;
         }
+
+        match names.as_slice() {
+            [owner, _] if owner == "Self" => self.impl_self.clone(),
+            [owner, _] => Some(owner.clone()),
+            [module, owner, _] if module == "self" => Some(owner.clone()),
+            _ => None,
+        }
+    }
+
+    fn within(&mut self, scope: Scope, walk: impl FnOnce(&mut Self)) {
+        self.test_depth += scope.depth();
+        walk(self);
+        self.test_depth -= scope.depth();
     }
 
     fn pattern_enum(&self, pattern: &Pat) -> Option<String> {
@@ -60,7 +79,7 @@ impl<'ast> Visit<'ast> for Exhaustive {
             .find_map(|arm| self.pattern_enum(&arm.pat))
             .filter(|name| self.enums.contains(name));
 
-        if let Some(name) = local {
+        if let Some(name) = local.filter(|_| self.test_depth == 0) {
             for arm in matching
                 .arms
                 .iter()
@@ -80,20 +99,30 @@ impl<'ast> Visit<'ast> for Exhaustive {
         visit::visit_expr_match(self, matching);
     }
 
+    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
+        self.within(Scope::of_fn(&function.attrs), |exhaustive| {
+            visit::visit_item_fn(exhaustive, function);
+        });
+    }
+
     fn visit_item_impl(&mut self, implementation: &'ast ItemImpl) {
         let outer = self.impl_self.take();
 
         self.impl_self = match &*implementation.self_ty {
-            Type::Path(path) => path
-                .path
-                .segments
-                .last()
-                .map(|segment| segment.ident.to_string()),
+            Type::Path(path) if path.qself.is_none() => {
+                path.path.get_ident().map(ToString::to_string)
+            }
             _ => None,
         };
 
         visit::visit_item_impl(self, implementation);
         self.impl_self = outer;
+    }
+
+    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
+        self.within(Scope::of_module(&module.attrs), |exhaustive| {
+            visit::visit_item_mod(exhaustive, module);
+        });
     }
 }
 
@@ -119,13 +148,18 @@ fn is_catch_all(pattern: &Pat) -> bool {
     }
 }
 
-pub(super) fn check(file: &File) -> Vec<Finding> {
+pub(super) fn check(file: &File, context: &Context) -> Vec<Finding> {
+    if context.in_tests() {
+        return Vec::new();
+    }
+
     let mut local = LocalEnums::default();
     local.visit_file(file);
     let mut exhaustive = Exhaustive {
         enums: local.names,
         impl_self: None,
         findings: Vec::new(),
+        test_depth: 0,
     };
     exhaustive.visit_file(file);
 
@@ -154,6 +188,27 @@ mod tests {
     #[test]
     fn foreign_enums_may_use_a_wildcard() {
         let text = "fn kind(error: &io::Error) -> u8 {\n    match error.kind() {\n        io::ErrorKind::NotFound => 1,\n        _ => 0,\n    }\n}\n";
+
+        assert_eq!(lines_of(Rule::NoWildcardOnLocalEnum, text), NONE);
+    }
+
+    #[test]
+    fn a_foreign_enum_with_a_local_name_passes() {
+        let text = "use crate::vt::style;\n\nenum Underline {\n    None,\n    Single,\n    Double,\n}\n\nfn convert(underline: style::Underline) -> Underline {\n    match underline {\n        style::Underline::None => Underline::None,\n        style::Underline::Double => Underline::Double,\n        _ => Underline::Single,\n    }\n}\n";
+
+        assert_eq!(lines_of(Rule::NoWildcardOnLocalEnum, text), NONE);
+    }
+
+    #[test]
+    fn a_self_path_to_the_local_enum_is_reported() {
+        let text = "enum Mode {\n    Fast,\n    Slow,\n}\n\nfn speed(mode: Mode) -> u8 {\n    match mode {\n        self::Mode::Fast => 3,\n        _ => 0,\n    }\n}\n";
+
+        assert_eq!(lines_of(Rule::NoWildcardOnLocalEnum, text), [9]);
+    }
+
+    #[test]
+    fn tests_may_pick_out_one_variant() {
+        let text = "enum Mode {\n    Fast,\n    Slow,\n}\n\n#[cfg(test)]\nmod tests {\n    fn fast(mode: Mode) -> bool {\n        match mode {\n            Mode::Fast => true,\n            _ => false,\n        }\n    }\n}\n";
 
         assert_eq!(lines_of(Rule::NoWildcardOnLocalEnum, text), NONE);
     }

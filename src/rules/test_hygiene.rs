@@ -12,9 +12,8 @@ use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{Block, Expr, ExprCall, ExprMethodCall, File, ImplItemFn, ItemFn, ItemMod, Macro};
 
-use super::test_scope::{is_test_fn, is_test_module, is_test_path};
-use super::{Finding, Rule};
-use crate::source::Source;
+use super::test_scope::{is_test_fn, is_test_module};
+use super::{Context, Finding, Rule};
 
 /// Names that say a test exists but not what it proves.
 const VAGUE_TEST_NAMES: [&str; 4] = ["it_works", "works", "basic", "smoke"];
@@ -222,12 +221,12 @@ fn is_vague(name: &str) -> bool {
             .is_some_and(|rest| rest.chars().all(|character| character.is_ascii_digit()))
 }
 
-pub(super) fn check(source: &Source, file: &File) -> Vec<Finding> {
+pub(super) fn check(file: &File, context: &Context) -> Vec<Finding> {
     let mut bodies = Bodies::default();
     bodies.visit_file(file);
     let mut hygiene = TestHygiene {
         findings: Vec::new(),
-        test_file: is_test_path(&source.path),
+        test_file: context.in_tests(),
         test_depth: 0,
         asserting: bodies.asserting(),
     };

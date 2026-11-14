@@ -372,7 +372,13 @@ fn list(value: Option<&Value>) -> Option<Vec<String>> {
 fn quoted(entries: &[&String]) -> String {
     entries
         .iter()
-        .map(|entry| format!("`{entry}`"))
+        .map(|entry| {
+            if *entry == DEFAULT_LIST {
+                "clippy's default list".to_owned()
+            } else {
+                format!("`{entry}`")
+            }
+        })
         .collect::<Vec<_>>()
         .join(", ")
 }

@@ -10,6 +10,8 @@ pub mod drift;
 pub mod files;
 pub mod init;
 pub mod lints;
+pub mod module_paths;
 pub mod preset;
 pub mod rules;
 pub mod source;
+pub mod tree;

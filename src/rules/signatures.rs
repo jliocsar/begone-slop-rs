@@ -13,9 +13,8 @@ use syn::{
     Signature, TraitItemFn, Type,
 };
 
-use super::test_scope::{is_test_fn, is_test_module, is_test_path};
-use super::{Finding, Rule};
-use crate::source::Source;
+use super::test_scope::{is_test_fn, is_test_module};
+use super::{Context, Finding, Rule};
 
 const RAW_ID_TYPES: [&str; 17] = [
     "String", "str", "Uuid", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64",
@@ -230,10 +229,10 @@ fn collected(ty: &Type) -> Option<&Type> {
     }
 }
 
-pub(super) fn check(source: &Source, file: &syn::File) -> Vec<Finding> {
+pub(super) fn check(file: &syn::File, context: &Context) -> Vec<Finding> {
     let mut signatures = Signatures {
         findings: Vec::new(),
-        test_file: is_test_path(&source.path),
+        test_file: context.in_tests(),
         test_depth: 0,
         in_trait_impl: false,
         in_id_impl: false,

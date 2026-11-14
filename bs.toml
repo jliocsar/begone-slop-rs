@@ -10,6 +10,7 @@ allowed = [
     "src/files.rs",
     "src/init.rs",
     "src/main.rs",
+    "src/tree.rs",
 ]
 
 [[layers]]

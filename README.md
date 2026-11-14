@@ -37,8 +37,12 @@ cargo bs src tests    # check some paths
 cargo bs init         # write clippy.toml + rustfmt.toml, print the lints table
 ```
 
-Inside a git checkout it reads what git tracks plus untracked files that aren't ignored. The exit
-code is 0 when clean, 1 on findings, 2 on a usage error. Run `cargo fmt` before `cargo bs --fix`:
+Inside a git checkout it reads exactly what git lists: tracked files plus untracked files that
+aren't ignored. The pattern rules get that same list, file by file, with ast-grep's own ignore
+files and any project `sgconfig.yml` switched off, so neither can hide a file. A path with no
+such files (say, a gitignored directory) is reported, and so is a file `syn` can't parse: no
+rule could check it, so it doesn't pass. The exit code is 0 when clean, 1 on findings, 2 on a
+usage error or when ast-grep is missing. Run `cargo fmt` before `cargo bs --fix`:
 formatting moves line breaks, and the padding rules judge the result. rustfmt keeps any blank lines
 it finds, so the two never fight.
 
@@ -72,6 +76,9 @@ in, so running it from a member crate checks the same thing. There's no waiver f
   `unsafe_code`, `allow_attributes`, `clippy::all`, `clippy::pedantic`, `warnings` and a few more.
 - `no-crate-level-allow`: no `#![allow]`/`#![expect]` for a whole file or module, and no waiver
   behind `cfg_attr`.
+- `no-hidden-code`: `#[path = "core.inc"] mod core;` and `include!("more.in")` compile code that
+  no rule reads, and so does either one pointing at a `.rs` file git doesn't list. Only Cargo's
+  generated-code idiom, `include!(concat!(env!("OUT_DIR"), ...))`, passes.
 - `waiver-needs-reason`: an `ast-grep-ignore` names its rules and says why:
   `// ast-grep-ignore: no-catch-unwind -- the FFI boundary must not unwind`.
 
@@ -148,7 +155,7 @@ The Effect rules have no Rust counterpart. `no-switch` doesn't port, since `matc
 | `prefer-match`         | an `if`/`else if` chain of 3+ tests of one subject against fixed values               |  —  |
 | `no-boolean-trap`      | a `bool` parameter; take a two-variant enum that names both cases                     |  —  |
 | `no-stringly-fields`   | a `kind`/`status`/`state`/`mode`/`level`/`role`… field or parameter typed as a string (parse fns exempt) |  —  |
-| `no-wildcard-on-local-enum` | `_ =>` or a catch-all binding on an enum this file defines                       |  —  |
+| `no-wildcard-on-local-enum` | `_ =>` or a catch-all binding on an enum this file defines (`Enum::V`, `self::Enum::V`, `Self::V`; not `other::Enum::V`), outside tests |  —  |
 | `no-blocking-in-async` | `std::fs`, `std::net`, `std::thread::sleep`, `std::process::Command`, blocking HTTP inside `async` |  —  |
 | `no-numbered-names`    | `item2` next to `item`, or `point1` next to `point2`                                  |  —  |
 | `no-type-in-name`      | `user_vec`, `name_str`, `lookup_hashmap`: the type already says it                    |  —  |
@@ -156,6 +163,12 @@ The Effect rules have no Rust counterpart. `no-switch` doesn't port, since `matc
 | `module-doc`           | a file without a `//!` comment saying what it's for (`build.rs` exempt)               |  —  |
 | `no-commented-out-code` | `//` comments that parse as Rust statements                                          |  —  |
 | `newtype-ids`          | an `id`/`*_id`/`*_ids` field or parameter typed `String`, `&str`, an integer or `Uuid` |  —  |
+
+Test code, which several rules exempt or only check, is a `#[test]` function, a `#[cfg(test)]`
+module (`cfg(all(test, ...))` too), a file in a `tests/` directory directly under a crate's root,
+and a file reached through `#[cfg(test)] mod x;` (with or without `#[path]`). The last one comes
+from walking each crate's module tree from its targets before the rules run, which also tells
+a binary's modules from a library's.
 
 `padding` is begone-slop's `padding-line-between-statements` preset, read for Rust:
 

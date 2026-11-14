@@ -68,6 +68,16 @@ pub const RULES: [(&str, &str); 15] = [
     ),
 ];
 
+/// A config file with nothing in it, so a project's `sgconfig.yml` isn't read.
+#[cfg(not(windows))]
+const EMPTY_CONFIG: &str = "/dev/null";
+
+#[cfg(windows)]
+const EMPTY_CONFIG: &str = "NUL";
+
+/// Every kind of ignore file ast-grep would otherwise honour.
+const NO_IGNORE: [&str; 6] = ["dot", "exclude", "global", "hidden", "parent", "vcs"];
+
 /// Why the pattern rules didn't run.
 #[derive(Debug)]
 pub enum AstGrepError {
@@ -88,25 +98,38 @@ impl fmt::Display for AstGrepError {
 
 impl std::error::Error for AstGrepError {}
 
-/// Scans `paths` with every pattern rule; ast-grep prints its own report. Returns whether the
-/// scan came back clean.
+/// Scans exactly `files` with every pattern rule; ast-grep prints its own report. Returns
+/// whether the scan came back clean.
+///
+/// The files are the ones git lists, passed one by one, with ast-grep's own ignore handling
+/// off and an empty config: a project's `.ignore` or `sgconfig.yml` (`languageGlobs` can
+/// remap `.rs`) mustn't hide files from these rules.
 ///
 /// # Errors
 ///
 /// Fails when `ast-grep` is missing or can't be started.
-pub fn scan(paths: &[PathBuf], mode: Mode) -> Result<bool, AstGrepError> {
+pub fn scan(files: &[PathBuf], mode: Mode) -> Result<bool, AstGrepError> {
+    if files.is_empty() {
+        return Ok(true);
+    }
+
     let rules: Vec<&str> = RULES.iter().map(|(_, text)| *text).collect();
     let mut command = Command::new("ast-grep");
     command
-        .args(["scan", "--inline-rules"])
+        .args(["scan", "--config", EMPTY_CONFIG, "--inline-rules"])
         .arg(rules.join("\n---\n"));
+
+    for ignore in NO_IGNORE {
+        command.args(["--no-ignore", ignore]);
+    }
 
     if mode == Mode::Fix {
         command.arg("--update-all");
     }
 
     let status = command
-        .args(paths)
+        .arg("--")
+        .args(files)
         .status()
         .map_err(|cause| match cause.kind() {
             io::ErrorKind::NotFound => AstGrepError::Missing,

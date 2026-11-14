@@ -12,9 +12,9 @@ use syn::visit::{self, Visit};
 use syn::{File, ItemFn, ItemMod, ItemUse};
 
 use super::paths::{segments, use_leaves};
-use super::test_scope::{is_test_fn, is_test_module, is_test_path};
-use super::{Finding, Rule};
-use crate::config::{Config, Layers};
+use super::test_scope::{is_test_fn, is_test_module};
+use super::{Context, Finding, Rule};
+use crate::config::Layers;
 use crate::source::Source;
 
 const RELATIVE_ROOTS: [&str; 3] = ["crate", "self", "super"];
@@ -153,8 +153,10 @@ fn module_path(relative: &Path) -> Option<Vec<String>> {
     Some(std::iter::once("crate".to_owned()).chain(parts).collect())
 }
 
-pub(super) fn check(source: &Source, file: &File, config: &Config) -> Vec<Finding> {
-    if is_test_path(&source.path) {
+pub(super) fn check(source: &Source, file: &File, context: &Context) -> Vec<Finding> {
+    let config = context.config;
+
+    if context.in_tests() {
         return Vec::new();
     }
 

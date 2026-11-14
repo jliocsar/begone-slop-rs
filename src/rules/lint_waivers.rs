@@ -10,9 +10,8 @@ use syn::visit::{self, Visit};
 use syn::{AttrStyle, Attribute, ItemFn, ItemMod, Meta, MetaList, Token};
 
 use super::paths::segments;
-use super::test_scope::{is_test_fn, is_test_module, is_test_path};
-use super::{Finding, Rule};
-use crate::source::Source;
+use super::test_scope::{is_test_fn, is_test_module};
+use super::{Context, Finding, Rule};
 
 const FORBIDDEN: [&str; 20] = [
     "clippy::all",
@@ -151,10 +150,10 @@ impl<'ast> Visit<'ast> for LintWaivers {
     }
 }
 
-pub(super) fn check(source: &Source, file: &syn::File) -> Vec<Finding> {
+pub(super) fn check(file: &syn::File, context: &Context) -> Vec<Finding> {
     let mut waivers = LintWaivers {
         findings: Vec::new(),
-        test_file: is_test_path(&source.path),
+        test_file: context.in_tests(),
         test_depth: 0,
     };
     waivers.visit_file(file);

@@ -4,7 +4,7 @@ use std::fmt;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use cargo_bs::check::{self, CheckError, Mode};
+use cargo_bs::check::{self, CheckError, Mode, Project};
 use cargo_bs::config::Config;
 use cargo_bs::{ast_grep, drift, files, init, preset};
 
@@ -138,10 +138,19 @@ fn run_check(options: &Options) -> ExitCode {
         }
     };
 
-    let paths = match files::rust_files(&options.paths) {
-        Ok(paths) => paths,
+    let (paths, mut problems) = match listed_files(&options.paths) {
+        Ok(listing) => listing,
         Err(error) => {
             eprintln!("cargo bs: {error}");
+
+            return ExitCode::from(2);
+        }
+    };
+
+    let project = match Project::new(config, &paths) {
+        Ok(project) => project,
+        Err(error) => {
+            eprintln!("cargo bs: can't list the project's files: {error}");
 
             return ExitCode::from(2);
         }
@@ -153,11 +162,74 @@ fn run_check(options: &Options) -> ExitCode {
         println!("{found}");
     }
 
-    let mut problems = drifts.len();
+    problems += drifts.len();
+    let (found, fixed) = check_files(&paths, options.mode, &project);
+    problems += found;
+
+    let patterns = if options.ast_grep {
+        ast_grep::scan(&paths, options.mode)
+    } else {
+        Ok(true)
+    };
+
+    if fixed > 0 {
+        println!("cargo bs: fixed {fixed}");
+    }
+
+    match patterns {
+        Ok(true) if problems == 0 => ExitCode::SUCCESS,
+        Ok(clean) => {
+            let patterns = if clean { "clean" } else { "failed" };
+
+            println!(
+                "cargo bs: {problems} finding(s) in {} file(s) and the gate's config; pattern rules {patterns}",
+                paths.len()
+            );
+
+            ExitCode::FAILURE
+        }
+        Err(error) => {
+            eprintln!("cargo bs: {error}");
+
+            ExitCode::from(2)
+        }
+    }
+}
+
+/// The files under each path, and how many paths had none: a path git ignores yields no
+/// files, and a run that checked nothing there mustn't pass as clean.
+fn listed_files(paths: &[PathBuf]) -> std::io::Result<(Vec<PathBuf>, usize)> {
+    let mut found = Vec::new();
+    let mut empty = 0;
+
+    for path in paths {
+        let listed = files::rust_files(std::slice::from_ref(path))?;
+
+        if listed.is_empty() {
+            println!(
+                "{}: no Rust files here that git lists (ignored?), so nothing here was checked",
+                path.display()
+            );
+            empty += 1;
+        }
+
+        found.extend(listed);
+    }
+
+    found.sort();
+    found.dedup();
+
+    Ok((found, empty))
+}
+
+/// Runs the syntax rules over every file; returns the findings left and the fixes made. A
+/// file that can't be parsed is a finding: no rule could check it.
+fn check_files(paths: &[PathBuf], mode: Mode, project: &Project) -> (usize, usize) {
+    let mut problems = 0;
     let mut fixed = 0;
 
-    for path in &paths {
-        match check::check_file(path, options.mode, &config) {
+    for path in paths {
+        match check::check_file(path, mode, project) {
             Ok(report) => {
                 for finding in &report.findings {
                     println!(
@@ -172,7 +244,10 @@ fn run_check(options: &Options) -> ExitCode {
                 problems += report.findings.len();
                 fixed += report.fixed;
             }
-            Err(error @ CheckError::Parse { .. }) => eprintln!("warning: {error}"),
+            Err(error @ CheckError::Parse { .. }) => {
+                println!("{error}");
+                problems += 1;
+            }
             Err(error) => {
                 eprintln!("error: {error}");
                 problems += 1;
@@ -180,31 +255,5 @@ fn run_check(options: &Options) -> ExitCode {
         }
     }
 
-    let patterns_clean = !options.ast_grep || scan_patterns(options);
-
-    if fixed > 0 {
-        println!("cargo bs: fixed {fixed}");
-    }
-
-    if problems == 0 && patterns_clean {
-        ExitCode::SUCCESS
-    } else {
-        println!(
-            "cargo bs: {problems} syntax finding(s) left in {} file(s)",
-            paths.len()
-        );
-
-        ExitCode::FAILURE
-    }
-}
-
-fn scan_patterns(options: &Options) -> bool {
-    match ast_grep::scan(&options.paths, options.mode) {
-        Ok(clean) => clean,
-        Err(error) => {
-            eprintln!("error: {error}");
-
-            false
-        }
-    }
+    (problems, fixed)
 }

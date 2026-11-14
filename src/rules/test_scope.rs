@@ -1,8 +1,9 @@
-//! What counts as test code: `tests/`, `#[test]`-like functions and `#[cfg(test)]` modules.
+//! What counts as test code inside a file: `#[test]`-like functions and `#[cfg(test)]`
+//! modules. Whole files are test code by their [`Role`](super::Role).
 
-use std::path::{Component, Path};
+use syn::Attribute;
 
-use syn::{Attribute, Meta};
+use crate::module_paths;
 
 /// Whether an item opens test code.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,14 +45,7 @@ pub(super) fn is_test_fn(attributes: &[Attribute]) -> bool {
     })
 }
 
+/// `#[cfg(test)]`, or `test` inside `cfg(all(...))`.
 pub(super) fn is_test_module(attributes: &[Attribute]) -> bool {
-    attributes.iter().any(|attribute| {
-        attribute.path().is_ident("cfg")
-            && matches!(&attribute.meta, Meta::List(list) if list.tokens.to_string() == "test")
-    })
-}
-
-pub(super) fn is_test_path(path: &Path) -> bool {
-    path.components()
-        .any(|component| component == Component::Normal("tests".as_ref()))
+    module_paths::is_test_only(attributes)
 }

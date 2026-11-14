@@ -7,9 +7,9 @@ use syn::visit::{self, Visit};
 use syn::{Block, File, ItemFn, ItemMod};
 
 use super::gap::{forbid_blank, require_blank};
-use super::test_scope::{Scope, is_test_path};
+use super::test_scope::Scope;
 use super::unit::{Kind, Unit};
-use super::{Finding, Rule};
+use super::{Context, Finding, Rule};
 use crate::source::Source;
 
 struct AssertPadding<'source> {
@@ -87,8 +87,8 @@ impl<'ast> Visit<'ast> for AssertPadding<'_> {
     }
 }
 
-pub(super) fn check(source: &Source, file: &File) -> Vec<Finding> {
-    let test_file = is_test_path(&source.path);
+pub(super) fn check(source: &Source, file: &File, context: &Context) -> Vec<Finding> {
+    let test_file = context.in_tests();
     let mut padding = AssertPadding {
         source,
         findings: Vec::new(),
