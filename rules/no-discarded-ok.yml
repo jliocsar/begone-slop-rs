@@ -1,0 +1,11 @@
+id: no-discarded-ok
+language: Rust
+severity: error
+message: '`.ok()` as a statement throws the error away unseen.'
+note: |
+  Handle it, return it with `?`, or log it. If dropping it really is right, say why next to
+  an explicit `if let Err(cause) = ...`.
+rule:
+  kind: expression_statement
+  has:
+    pattern: $VALUE.ok()

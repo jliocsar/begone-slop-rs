@@ -1,0 +1,16 @@
+id: no-box-dyn-error
+language: Rust
+severity: error
+message: A boxed `dyn Error` erases which failures can happen. Return a typed error.
+note: |
+  Callers can only print a `Box<dyn Error>`, never handle it. Binaries, build scripts, tests
+  and examples are exempt, since nothing downstream matches on their errors.
+rule:
+  kind: generic_type
+  regex: '^Box\s*<\s*dyn\s+(std::error::)?Error\b'
+ignores:
+  - '**/main.rs'
+  - '**/bin/**'
+  - '**/build.rs'
+  - '**/tests/**'
+  - '**/examples/**'

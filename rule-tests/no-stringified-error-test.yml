@@ -1,0 +1,7 @@
+id: no-stringified-error
+valid:
+  - 'fn parse() { input.parse::<u8>().map_err(ParseError::Number) }'
+invalid:
+  - 'fn parse() { input.parse::<u8>().map_err(|error| error.to_string()) }'
+  - 'fn parse() { input.parse::<u8>().map_err(|error| format!("bad number: {error}")) }'
+  - 'fn parse() { input.parse::<u8>().map_err(ToString::to_string) }'

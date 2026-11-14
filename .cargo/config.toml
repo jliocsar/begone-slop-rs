@@ -1,0 +1,4 @@
+# The bootstrap: inside this repo, `cargo bs` is the tool built from this tree, so every
+# change is checked by the rules it ships, including changes to those rules.
+[alias]
+bs = "run --quiet --bin cargo-bs -- bs"

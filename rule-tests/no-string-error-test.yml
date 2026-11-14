@@ -1,0 +1,8 @@
+id: no-string-error
+valid:
+  - 'fn parse() -> Result<u8, ParseError> { parse_it() }'
+  - 'fn nested() -> Result<Wrapper<Item, String>, ParseError> { parse_it() }'
+invalid:
+  - 'fn parse() -> Result<u8, String> { parse_it() }'
+  - "fn parse() -> Result<u8, &'static str> { parse_it() }"
+  - 'fn nested() -> Option<Result<u8, String>> { parse_it() }'

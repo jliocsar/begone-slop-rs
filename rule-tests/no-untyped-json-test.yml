@@ -1,0 +1,8 @@
+id: no-untyped-json
+valid:
+  - 'fn read(event: Event) { handle(event) }'
+  - 'use serde_json::from_str;'
+invalid:
+  - 'fn read(event: serde_json::Value) { handle(event) }'
+  - 'use serde_json::Value;'
+  - 'use serde_json::{from_str, Value};'

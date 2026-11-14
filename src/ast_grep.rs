@@ -1,0 +1,115 @@
+//! The pattern rules, run through the `ast-grep` CLI with the rule files this binary carries.
+
+use std::fmt;
+use std::io;
+use std::path::PathBuf;
+use std::process::Command;
+
+/// The files in `rules/`, by id. A test keeps this list and the directory equal.
+pub const RULES: [(&str, &str); 7] = [
+    (
+        "no-box-dyn-error",
+        include_str!("../rules/no-box-dyn-error.yml"),
+    ),
+    (
+        "no-catch-unwind",
+        include_str!("../rules/no-catch-unwind.yml"),
+    ),
+    (
+        "no-discarded-ok",
+        include_str!("../rules/no-discarded-ok.yml"),
+    ),
+    (
+        "no-glob-reexport",
+        include_str!("../rules/no-glob-reexport.yml"),
+    ),
+    (
+        "no-string-error",
+        include_str!("../rules/no-string-error.yml"),
+    ),
+    (
+        "no-stringified-error",
+        include_str!("../rules/no-stringified-error.yml"),
+    ),
+    (
+        "no-untyped-json",
+        include_str!("../rules/no-untyped-json.yml"),
+    ),
+];
+
+/// Why the pattern rules didn't run.
+#[derive(Debug)]
+pub enum AstGrepError {
+    Missing,
+    Spawn(io::Error),
+}
+
+impl fmt::Display for AstGrepError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Missing => formatter.write_str(
+                "ast-grep isn't on PATH, so the pattern rules didn't run; install it (`cargo install ast-grep` or `mise use ast-grep`), or pass --no-ast-grep",
+            ),
+            Self::Spawn(cause) => write!(formatter, "couldn't run ast-grep: {cause}"),
+        }
+    }
+}
+
+impl std::error::Error for AstGrepError {}
+
+/// Scans `paths` with every pattern rule; ast-grep prints its own report. Returns whether the
+/// scan came back clean.
+///
+/// # Errors
+///
+/// Fails when `ast-grep` is missing or can't be started.
+pub fn scan(paths: &[PathBuf], fix: bool) -> Result<bool, AstGrepError> {
+    let rules: Vec<&str> = RULES.iter().map(|(_, text)| *text).collect();
+    let mut command = Command::new("ast-grep");
+    command
+        .args(["scan", "--inline-rules"])
+        .arg(rules.join("\n---\n"));
+
+    if fix {
+        command.arg("--update-all");
+    }
+
+    let status = command
+        .args(paths)
+        .status()
+        .map_err(|cause| match cause.kind() {
+            io::ErrorKind::NotFound => AstGrepError::Missing,
+            _ => AstGrepError::Spawn(cause),
+        })?;
+
+    Ok(status.success())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+
+    use super::RULES;
+
+    #[test]
+    fn every_rule_file_is_embedded() {
+        let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("rules");
+        let mut on_disk: Vec<String> = fs::read_dir(directory)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter_map(|path| Some(path.file_stem()?.to_str()?.to_owned()))
+            .collect();
+        on_disk.sort();
+        let embedded: Vec<&str> = RULES.iter().map(|(id, _)| *id).collect();
+
+        assert_eq!(on_disk, embedded);
+    }
+
+    #[test]
+    fn each_rule_declares_its_own_id() {
+        for (id, text) in RULES {
+            assert!(text.starts_with(&format!("id: {id}\n")), "{id}");
+        }
+    }
+}

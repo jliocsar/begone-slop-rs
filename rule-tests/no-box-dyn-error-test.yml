@@ -1,0 +1,7 @@
+id: no-box-dyn-error
+valid:
+  - 'fn load() -> Result<(), LoadError> { load_it() }'
+  - 'fn draw() -> Box<dyn Widget> { draw_it() }'
+invalid:
+  - 'fn load() -> Result<(), Box<dyn Error>> { load_it() }'
+  - 'fn load() -> Result<(), Box<dyn std::error::Error + Send + Sync>> { load_it() }'

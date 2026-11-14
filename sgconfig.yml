@@ -1,0 +1,6 @@
+# Lets the ast-grep CLI and editor language server read the rules straight from this repo.
+# `cargo bs` doesn't need it: the binary carries the same files.
+ruleDirs:
+  - rules
+testConfigs:
+  - testDir: rule-tests

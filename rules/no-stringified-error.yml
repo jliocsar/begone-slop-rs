@@ -1,0 +1,13 @@
+id: no-stringified-error
+language: Rust
+severity: error
+message: Turning an error into a string drops its type and its source chain.
+note: |
+  Wrap it in a variant of your own error type and keep the original as its source
+  (`#[from]` or `#[source]` with thiserror).
+rule:
+  any:
+    - pattern: $VALUE.map_err(|$ERROR| $ERROR.to_string())
+    - pattern: $VALUE.map_err(|$ERROR| format!($$$ARGS))
+    - pattern: $VALUE.map_err(ToString::to_string)
+    - pattern: $VALUE.map_err(|$ERROR| $ERROR.to_string().into())

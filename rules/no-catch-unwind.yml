@@ -1,0 +1,12 @@
+id: no-catch-unwind
+language: Rust
+severity: error
+message: A panic is a bug, not control flow. Return a Result instead of catching it.
+note: |
+  The one real use is an FFI or thread boundary that must not unwind. Waive it there with
+  `// ast-grep-ignore: no-catch-unwind` and a reason.
+rule:
+  kind: call_expression
+  has:
+    field: function
+    regex: '(^|::)catch_unwind$'

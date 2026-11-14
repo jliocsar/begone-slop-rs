@@ -1,0 +1,6 @@
+id: no-catch-unwind
+valid:
+  - 'fn run() { catch_up(work); }'
+invalid:
+  - 'fn run() { let outcome = std::panic::catch_unwind(work); }'
+  - 'fn run() { let outcome = catch_unwind(work); }'

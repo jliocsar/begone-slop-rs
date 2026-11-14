@@ -1,0 +1,7 @@
+id: no-glob-reexport
+valid:
+  - 'pub use crate::shapes::{Circle, Square};'
+  - 'use super::*;'
+invalid:
+  - 'pub use crate::shapes::*;'
+  - 'pub(crate) use crate::shapes::*;'

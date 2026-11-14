@@ -1,0 +1,6 @@
+id: no-discarded-ok
+valid:
+  - 'fn clean() { let removed = std::fs::remove_file(path).ok(); }'
+  - 'fn first() -> Option<u8> { input.parse().ok() }'
+invalid:
+  - 'fn clean() { std::fs::remove_file(path).ok(); }'

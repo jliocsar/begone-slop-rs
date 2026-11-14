@@ -1,0 +1,10 @@
+id: no-string-error
+language: Rust
+severity: error
+message: A string error can't be matched on. Give the failure a type.
+note: |
+  Use an enum with one variant per failure reason, with a Display impl that says what went
+  wrong and how to fix it. anyhow is fine in binaries, where nobody matches on the error.
+rule:
+  kind: generic_type
+  regex: '^Result\s*<[\s\S]*,\s*(String|&\s*(''\w+\s+)?str)\s*>$'

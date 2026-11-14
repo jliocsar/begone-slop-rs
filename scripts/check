@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# The gate. `cargo bs` here is the alias in .cargo/config.toml: the tool built from this
+# tree checks this tree.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+cargo fmt --all --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
+cargo bs
+ast-grep test --skip-snapshot-tests

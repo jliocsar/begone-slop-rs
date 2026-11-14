@@ -1,0 +1,12 @@
+id: no-glob-reexport
+language: Rust
+severity: error
+message: A glob re-export hides where a name comes from. Re-export the names you mean.
+rule:
+  kind: use_declaration
+  all:
+    - has:
+        kind: visibility_modifier
+    - has:
+        kind: use_wildcard
+        stopBy: end

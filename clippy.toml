@@ -1,0 +1,13 @@
+# begone-slop clippy preset. `cargo bs init` writes this file into a project.
+
+# Two characters at least, with the loop counters as the only exceptions.
+min-ident-chars-threshold = 1
+allowed-idents-below-min-chars = ["i", "j"]
+
+excessive-nesting-threshold = 5
+
+# A panic in a test is the failure report.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-dbg-in-tests = true

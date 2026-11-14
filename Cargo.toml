@@ -1,0 +1,43 @@
+[package]
+name = "cargo-bs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "begone-slop for Rust: lint rules that reject low-evidence code"
+license = "MIT"
+repository = "https://github.com/jliocsar/begone-slop-rs"
+readme = "README.md"
+keywords = ["lint", "ast-grep", "clippy", "cargo-subcommand"]
+categories = ["development-tools::cargo-plugins"]
+
+[workspace]
+
+[dependencies]
+proc-macro2 = { version = "1", features = ["span-locations"] }
+syn = { version = "2", default-features = false, features = ["full", "parsing", "printing", "visit"] }
+
+[lints]
+workspace = true
+
+[profile.dev]
+debug = "line-tables-only"
+
+# Everything below is preset/lints.toml, verbatim. A test keeps the two equal.
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+dbg_macro = "warn"
+expect_used = "warn"
+let_underscore_must_use = "warn"
+map_err_ignore = "warn"
+min_ident_chars = "warn"
+panic = "warn"
+todo = "warn"
+undocumented_unsafe_blocks = "warn"
+unimplemented = "warn"
+unwrap_used = "warn"
