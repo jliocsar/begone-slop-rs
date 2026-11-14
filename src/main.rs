@@ -1,11 +1,12 @@
 //! `cargo bs`: begone-slop for Rust.
 
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use cargo_bs::check::{self, CheckError};
-use cargo_bs::{ast_grep, files, init};
+use cargo_bs::check::{self, CheckError, Mode};
+use cargo_bs::config::Config;
+use cargo_bs::{ast_grep, drift, files, init};
 
 const USAGE: &str = "\
 usage: cargo bs [--fix] [--no-ast-grep] [PATH...]
@@ -27,7 +28,7 @@ enum Command {
 }
 
 struct Options {
-    fix: bool,
+    mode: Mode,
     ast_grep: bool,
     paths: Vec<PathBuf>,
 }
@@ -70,14 +71,14 @@ fn parse(arguments: Vec<String>) -> Result<Command, UnknownFlag> {
     }
 
     let mut options = Options {
-        fix: false,
+        mode: Mode::Report,
         ast_grep: true,
         paths: Vec::new(),
     };
 
     for argument in arguments {
         match argument.as_str() {
-            "--fix" => options.fix = true,
+            "--fix" => options.mode = Mode::Fix,
             "--no-ast-grep" => options.ast_grep = false,
             "-h" | "--help" => return Ok(Command::Help),
             flag if flag.starts_with('-') => return Err(UnknownFlag(argument)),
@@ -118,6 +119,17 @@ fn run_init() -> ExitCode {
 }
 
 fn run_check(options: &Options) -> ExitCode {
+    let root = Path::new(".");
+
+    let config = match Config::load(root) {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("cargo bs: {error}");
+
+            return ExitCode::from(2);
+        }
+    };
+
     let paths = match files::rust_files(&options.paths) {
         Ok(paths) => paths,
         Err(error) => {
@@ -127,11 +139,22 @@ fn run_check(options: &Options) -> ExitCode {
         }
     };
 
-    let mut problems = 0;
+    let drifts = drift::check(root);
+
+    for found in &drifts {
+        println!(
+            "{}:{}: preset-drift: {}",
+            found.path.display(),
+            found.line,
+            found.message
+        );
+    }
+
+    let mut problems = drifts.len();
     let mut fixed = 0;
 
     for path in &paths {
-        match check::check_file(path, options.fix) {
+        match check::check_file(path, options.mode, &config) {
             Ok(report) => {
                 for finding in &report.findings {
                     println!(
@@ -173,7 +196,7 @@ fn run_check(options: &Options) -> ExitCode {
 }
 
 fn scan_patterns(options: &Options) -> bool {
-    match ast_grep::scan(&options.paths, options.fix) {
+    match ast_grep::scan(&options.paths, options.mode) {
         Ok(clean) => clean,
         Err(error) => {
             eprintln!("error: {error}");

@@ -11,10 +11,13 @@ use std::path::Path;
 /// The `[workspace.lints]` tables, as `preset/lints.toml` holds them.
 pub const LINTS: &str = include_str!("../preset/lints.toml");
 
-const PRESET_FILES: [(&str, &str); 2] = [
-    ("clippy.toml", include_str!("../clippy.toml")),
-    ("rustfmt.toml", include_str!("../rustfmt.toml")),
-];
+/// The preset `clippy.toml`, which is this repo's own.
+pub const CLIPPY: &str = include_str!("../clippy.toml");
+
+/// The preset `rustfmt.toml`, which is this repo's own.
+pub const RUSTFMT: &str = include_str!("../rustfmt.toml");
+
+const PRESET_FILES: [(&str, &str); 2] = [("clippy.toml", CLIPPY), ("rustfmt.toml", RUSTFMT)];
 
 /// What `init` did with one preset file.
 pub enum Outcome {

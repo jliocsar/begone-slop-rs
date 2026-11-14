@@ -1,4 +1,4 @@
-//! Which `.rs` files a run covers: git's view of the tree when there is one, a walk otherwise.
+//! Which files a run covers: git's view of the tree when there is one, a walk otherwise.
 
 use std::fs;
 use std::io;
@@ -19,9 +19,9 @@ pub fn rust_files(paths: &[PathBuf]) -> io::Result<Vec<PathBuf>> {
         if path.is_file() {
             found.extend(is_rust(path).then(|| path.clone()));
         } else {
-            found.extend(match tracked_by_git(path) {
+            found.extend(match tracked_by_git(path, Some("*.rs")) {
                 Some(files) => files,
-                None => walk(path)?,
+                None => walk(path, &is_rust)?,
             });
         }
     }
@@ -32,11 +32,29 @@ pub fn rust_files(paths: &[PathBuf]) -> io::Result<Vec<PathBuf>> {
     Ok(found)
 }
 
+/// Every file under `root` with one of these names, in git's view of the tree when there is one.
+#[must_use]
+pub fn named(root: &Path, names: &[&str]) -> Vec<PathBuf> {
+    let has_name = |path: &Path| {
+        path.file_name()
+            .is_some_and(|name| names.iter().any(|wanted| name == *wanted))
+    };
+
+    let candidates = tracked_by_git(root, None)
+        .or_else(|| walk(root, &has_name).ok())
+        .unwrap_or_default();
+
+    candidates
+        .into_iter()
+        .filter(|path| has_name(path))
+        .collect()
+}
+
 fn is_rust(path: &Path) -> bool {
     path.extension().is_some_and(|extension| extension == "rs")
 }
 
-fn tracked_by_git(directory: &Path) -> Option<Vec<PathBuf>> {
+fn tracked_by_git(directory: &Path, pattern: Option<&str>) -> Option<Vec<PathBuf>> {
     let output = Command::new("git")
         .arg("-C")
         .arg(directory)
@@ -47,8 +65,8 @@ fn tracked_by_git(directory: &Path) -> Option<Vec<PathBuf>> {
             "--others",
             "--exclude-standard",
             "--",
-            "*.rs",
         ])
+        .args(pattern)
         .output()
         .ok()
         .filter(|output| output.status.success())?;
@@ -64,7 +82,7 @@ fn tracked_by_git(directory: &Path) -> Option<Vec<PathBuf>> {
     )
 }
 
-fn walk(directory: &Path) -> io::Result<Vec<PathBuf>> {
+fn walk(directory: &Path, keep: &dyn Fn(&Path) -> bool) -> io::Result<Vec<PathBuf>> {
     let mut found = Vec::new();
 
     for entry in fs::read_dir(directory)? {
@@ -73,8 +91,8 @@ fn walk(directory: &Path) -> io::Result<Vec<PathBuf>> {
         let skipped = name.starts_with('.') || SKIPPED_DIRECTORIES.contains(&name.as_ref());
 
         if path.is_dir() && !skipped {
-            found.extend(walk(&path)?);
-        } else if is_rust(&path) {
+            found.extend(walk(&path, keep)?);
+        } else if keep(&path) {
             found.push(path);
         }
     }

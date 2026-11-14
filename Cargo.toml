@@ -14,7 +14,10 @@ categories = ["development-tools::cargo-plugins"]
 
 [dependencies]
 proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+serde = { version = "1", features = ["derive"] }
 syn = { version = "2", default-features = false, features = ["full", "parsing", "printing", "visit"] }
+toml = { version = "1", default-features = false, features = ["display", "parse", "serde", "std"] }
 
 [lints]
 workspace = true
@@ -40,6 +43,7 @@ let_underscore_must_use = "warn"
 map_err_ignore = "warn"
 min_ident_chars = "warn"
 mod_module_files = "warn"
+option_if_let_else = "warn"
 panic = "warn"
 panic_in_result_fn = "warn"
 todo = "warn"

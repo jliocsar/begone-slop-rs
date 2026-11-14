@@ -7,7 +7,7 @@ use syn::visit::{self, Visit};
 use syn::{Block, File, ItemFn, ItemMod};
 
 use super::gap::{forbid_blank, require_blank};
-use super::test_scope::{is_test_fn, is_test_module, is_test_path};
+use super::test_scope::{Scope, is_test_path};
 use super::unit::{Kind, Unit};
 use super::{Finding, Rule};
 use crate::source::Source;
@@ -24,10 +24,10 @@ impl AssertPadding<'_> {
         self.test_file || self.test_depth > 0
     }
 
-    fn within_tests(&mut self, is_test: bool, walk: impl FnOnce(&mut Self)) {
-        self.test_depth += usize::from(is_test);
+    fn within(&mut self, scope: Scope, walk: impl FnOnce(&mut Self)) {
+        self.test_depth += scope.depth();
         walk(self);
-        self.test_depth -= usize::from(is_test);
+        self.test_depth -= scope.depth();
     }
 
     fn sequence(&mut self, block: &Block) {
@@ -75,13 +75,13 @@ impl<'ast> Visit<'ast> for AssertPadding<'_> {
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.within_tests(is_test_fn(&function.attrs), |padding| {
+        self.within(Scope::of_fn(&function.attrs), |padding| {
             visit::visit_item_fn(padding, function);
         });
     }
 
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        self.within_tests(is_test_module(&module.attrs), |padding| {
+        self.within(Scope::of_module(&module.attrs), |padding| {
             visit::visit_item_mod(padding, module);
         });
     }

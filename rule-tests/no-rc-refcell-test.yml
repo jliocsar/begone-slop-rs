@@ -1,0 +1,6 @@
+id: no-rc-refcell
+valid:
+  - 'struct Row { cells: Rc<GridRow> }'
+invalid:
+  - 'struct Pane { state: Rc<RefCell<State>> }'
+  - 'struct Pane { count: Rc<Cell<u32>> }'

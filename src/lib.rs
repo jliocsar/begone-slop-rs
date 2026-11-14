@@ -5,6 +5,8 @@
 
 pub mod ast_grep;
 pub mod check;
+pub mod config;
+pub mod drift;
 pub mod files;
 pub mod init;
 pub mod rules;

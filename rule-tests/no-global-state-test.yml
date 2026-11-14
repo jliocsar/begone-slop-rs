@@ -1,0 +1,8 @@
+id: no-global-state
+valid:
+  - 'static PATTERN: LazyLock<Regex> = LazyLock::new(build);'
+  - 'static LIMIT: u32 = 8;'
+invalid:
+  - 'static mut COUNTER: u32 = 0;'
+  - 'static SESSIONS: LazyLock<Mutex<Vec<Session>>> = LazyLock::new(Default::default);'
+  - 'static NEXT: AtomicU64 = AtomicU64::new(0);'

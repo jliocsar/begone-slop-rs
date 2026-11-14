@@ -42,6 +42,48 @@ code is 0 when clean, 1 on findings, 2 on a usage error. Run `cargo fmt` before 
 formatting moves line breaks, and the padding rules judge the result. rustfmt keeps any blank lines
 it finds, so the two never fight.
 
+## Keeping the gate shut
+
+The quickest way past a lint gate is to weaken the gate, so `cargo bs` checks that too.
+
+- `preset-drift`: every preset lint stays at its preset level or stricter, every crate inherits
+  the workspace lints (`[lints] workspace = true`), and every `clippy.toml` keeps the preset's
+  settings. A project may add lints and settings; it may not loosen these. There's no waiver.
+- `no-forbidden-expects`: outside tests, the lints that guard the gate can't be waived at all, not
+  even with a reason: `unwrap_used`, `expect_used`, `panic`, `todo`, `dead_code`, `unused*`,
+  `unsafe_code`, `allow_attributes`, `clippy::all`, `clippy::pedantic`, `warnings` and a few more.
+- `no-crate-level-allow`: no `#![allow]`/`#![expect]` for a whole file or module, and no waiver
+  behind `cfg_attr`.
+- `waiver-needs-reason`: an `ast-grep-ignore` names its rules and says why:
+  `// ast-grep-ignore: no-catch-unwind -- the FFI boundary must not unwind`.
+
+## Boundaries: `bs.toml`
+
+Two rules need to know the project's architecture, so they read an optional `bs.toml` at the
+root. Without one, they're off.
+
+```toml
+[io]
+# The shell: the only files allowed to touch the outside world. Everything else is pure.
+allowed = ["src/main.rs", "src/shell"]
+# Effects of your own, on top of the built-in list.
+effects = ["sqlx"]
+
+[[layers]]
+crate = "crates/client"
+# Top first. A module may import from its own layer and the ones below, never above.
+order = ["crate::conn", "crate::proto"]
+```
+
+- `io-boundary`: functional core, imperative shell. Outside `allowed`, nothing may reach the file
+  system, network, processes, environment, stdio (`print!` and friends included), clock,
+  randomness or signals. It's checked where an effect is imported, and where a full path names it
+  in code. Test code is exempt.
+- `layers`: each `use`, and each path written from `crate`/`self`/`super`, points down the
+  declared order. Between crates, Cargo's dependency graph already does this.
+
+This repo's own [`bs.toml`](bs.toml) keeps `src/rules/` pure and layered below `check`.
+
 ## The clippy preset
 
 `cargo bs init` writes `clippy.toml` and `rustfmt.toml` when the project has none. It also prints
@@ -83,6 +125,11 @@ The Effect rules have no Rust counterpart. `no-switch` doesn't port, since `matc
 | `no-abbreviations`     | a declared name with an abbreviation that needs decoding (`ctx`, `cfg`, `idx`, `msg`…) |  —  |
 | `test-name`            | a test named `test_*`, `*_test`, `test2`, `it_works`, `works`, `basic` or `smoke`     |  —  |
 | `no-sleep-in-tests`    | `sleep` in test code (`thread::sleep`, `tokio::time::sleep`, …)                       |  —  |
+| `test-must-assert`     | a `#[test]` with no assertion, no `#[should_panic]`, and no call to a helper that asserts |  —  |
+| `no-mutable-accumulator` | `let mut v = Vec::new(); for x in xs { v.push(…) }`: use `.map().collect()`, `.sum()`, `.fold()` |  —  |
+| `prefer-match`         | an `if`/`else if` chain of 3+ tests of one subject against fixed values               |  —  |
+| `no-boolean-trap`      | a `bool` parameter; take a two-variant enum that names both cases                     |  —  |
+| `newtype-ids`          | an `id`/`*_id`/`*_ids` field or parameter typed `String`, `&str`, an integer or `Uuid` |  —  |
 
 `padding` is begone-slop's `padding-line-between-statements` preset, read for Rust:
 
@@ -103,7 +150,9 @@ and `tests/`. It covers `assert!`, `assert_eq!`, `assert_ne!`, `assert_matches!`
 `debug_` forms.
 
 `complexity` starts at 1 and adds one for each `if`, loop, `&&`, `||`, `let ... else`, and match
-arm past the first, plus one per guard. `?` doesn't count: it's how Rust says "and then", and
+arm past the first, plus one per guard. A lookup `match`, where every arm is a plain value (a
+literal, a path, a constructor of values) and none has a guard, counts once: it's a table, not a
+decision tree. `?` doesn't count: it's how Rust says "and then", and
 counting it would punish the code that handles every error. Closures count toward their function,
 and nested `fn`s are measured on their own.
 
@@ -137,6 +186,9 @@ fn key_name(key: Key) -> &'static str {
 | `no-swallowed-parse`   | `.parse().unwrap_or(…)` and friends: bad input becomes a default  |
 | `todo-needs-issue`     | `TODO`/`FIXME`/`XXX`/`HACK` without `(ABC-123)`, `(#12)` or a URL |
 | `ignore-needs-reason`  | a bare `#[ignore]`; write `#[ignore = "why"]`                      |
+| `waiver-needs-reason`  | an `ast-grep-ignore` without rule ids and a ` -- reason`          |
+| `no-global-state`      | a `static mut`, or a `static` holding a `Mutex`, `RefCell`, `Cell` or atomic |
+| `no-rc-refcell`        | `Rc<RefCell<_>>` and `Rc<Cell<_>>`: give the state one owner      |
 
 Waive one with ast-grep's own `// ast-grep-ignore: <rule>` comment, and a reason next to it. The
 rule files live in [`rules/`](rules), with tests in [`rule-tests/`](rule-tests). `sgconfig.yml`

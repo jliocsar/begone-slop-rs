@@ -1,0 +1,17 @@
+# This repo's own boundaries, checked by the tool it builds.
+
+[io]
+# The shell. Everything under src/rules is the pure core: it reads syntax trees, never the disk.
+allowed = [
+    "src/ast_grep.rs",
+    "src/check.rs",
+    "src/config.rs",
+    "src/drift.rs",
+    "src/files.rs",
+    "src/init.rs",
+    "src/main.rs",
+]
+
+[[layers]]
+crate = "."
+order = ["crate::check", "crate::rules", "crate::config", "crate::source"]

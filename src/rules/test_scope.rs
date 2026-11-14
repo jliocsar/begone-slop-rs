@@ -4,6 +4,35 @@ use std::path::{Component, Path};
 
 use syn::{Attribute, Meta};
 
+/// Whether an item opens test code.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Scope {
+    Test,
+    Plain,
+}
+
+impl Scope {
+    pub(super) fn of_fn(attributes: &[Attribute]) -> Self {
+        if is_test_fn(attributes) {
+            Self::Test
+        } else {
+            Self::Plain
+        }
+    }
+
+    pub(super) fn of_module(attributes: &[Attribute]) -> Self {
+        if is_test_module(attributes) {
+            Self::Test
+        } else {
+            Self::Plain
+        }
+    }
+
+    pub(super) fn depth(self) -> usize {
+        usize::from(self == Self::Test)
+    }
+}
+
 /// Any attribute whose last segment is `test`: `#[test]`, `#[tokio::test]`, `#[rstest::test]`.
 pub(super) fn is_test_fn(attributes: &[Attribute]) -> bool {
     attributes.iter().any(|attribute| {

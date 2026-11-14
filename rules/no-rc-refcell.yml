@@ -1,0 +1,11 @@
+id: no-rc-refcell
+language: Rust
+severity: error
+message: '`Rc<RefCell<_>>` shares mutable state with everyone who holds a clone. Give the state one owner.'
+note: |
+  Keep the state in one place and change it through that owner: messages, a handle that sends
+  updates, or `&mut` passed down. A web of `Rc<RefCell>` makes every borrow a possible
+  runtime panic and every holder a writer.
+rule:
+  kind: generic_type
+  regex: '^Rc\s*<\s*(std::cell::)?(RefCell|Cell)\b'

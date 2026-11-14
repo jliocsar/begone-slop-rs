@@ -26,6 +26,13 @@ pub(super) enum Kind {
     Use,
 }
 
+/// Whether a unit fits on one line.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Height {
+    OneLine,
+    MultiLine,
+}
+
 /// One statement or item, from its first attribute to its last token.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Unit {
@@ -44,12 +51,17 @@ impl Unit {
 
     pub(super) fn of_stmt(stmt: &Stmt) -> Self {
         let (start, end) = lines_of(stmt);
-        let multi_line = end > start;
+
+        let height = if end > start {
+            Height::MultiLine
+        } else {
+            Height::OneLine
+        };
 
         let kind = match stmt {
-            Stmt::Local(local) => local_kind(local, multi_line),
-            Stmt::Item(item) => item_kind(item, multi_line),
-            Stmt::Expr(expr, _) => expr_kind(expr, multi_line),
+            Stmt::Local(local) => local_kind(local, height),
+            Stmt::Item(item) => item_kind(item, height),
+            Stmt::Expr(expr, _) => expr_kind(expr, height),
             Stmt::Macro(statement) => macro_kind(&statement.mac),
         };
 
@@ -62,20 +74,32 @@ impl Unit {
         Self {
             start,
             end,
-            kind: item_kind(item, end > start),
+            kind: item_kind(
+                item,
+                if end > start {
+                    Height::MultiLine
+                } else {
+                    Height::OneLine
+                },
+            ),
         }
     }
 
     pub(super) fn of_impl_item(item: &ImplItem) -> Self {
         let (start, end) = lines_of(item);
-        let multi_line = end > start;
+
+        let height = if end > start {
+            Height::MultiLine
+        } else {
+            Height::OneLine
+        };
 
         let kind = match item {
             ImplItem::Fn(_) => Kind::ItemBlock,
-            ImplItem::Const(constant) if !multi_line => Kind::Const {
+            ImplItem::Const(constant) if height == Height::OneLine => Kind::Const {
                 public: is_public(&constant.vis),
             },
-            _ if multi_line => Kind::ItemBlock,
+            _ if height == Height::MultiLine => Kind::ItemBlock,
             _ => Kind::Other,
         };
 
@@ -84,12 +108,17 @@ impl Unit {
 
     pub(super) fn of_trait_item(item: &TraitItem) -> Self {
         let (start, end) = lines_of(item);
-        let multi_line = end > start;
+
+        let height = if end > start {
+            Height::MultiLine
+        } else {
+            Height::OneLine
+        };
 
         let kind = match item {
             TraitItem::Fn(function) if function.default.is_some() => Kind::ItemBlock,
-            TraitItem::Const(_) if !multi_line => Kind::Const { public: true },
-            _ if multi_line => Kind::ItemBlock,
+            TraitItem::Const(_) if height == Height::OneLine => Kind::Const { public: true },
+            _ if height == Height::MultiLine => Kind::ItemBlock,
             _ => Kind::Other,
         };
 
@@ -127,40 +156,42 @@ fn is_block_closure(expr: &Expr) -> bool {
     matches!(expr, Expr::Closure(closure) if matches!(*closure.body, Expr::Block(_)))
 }
 
-fn expr_kind(expr: &Expr, multi_line: bool) -> Kind {
+fn expr_kind(expr: &Expr, height: Height) -> Kind {
     match expr {
         Expr::Return(_) => Kind::Return,
         Expr::Macro(invocation) => macro_kind(&invocation.mac),
-        Expr::Assign(assign) if multi_line && owns_block(&assign.right) => Kind::BlockLike,
+        Expr::Assign(assign) if height == Height::MultiLine && owns_block(&assign.right) => {
+            Kind::BlockLike
+        }
         _ if owns_block(expr) => Kind::BlockLike,
         _ => Kind::Other,
     }
 }
 
-fn local_kind(local: &Local, multi_line: bool) -> Kind {
+fn local_kind(local: &Local, height: Height) -> Kind {
     let block_like = local.init.as_ref().is_some_and(|init| {
         init.diverge.is_some() || owns_block(&init.expr) || is_block_closure(&init.expr)
     });
 
-    if multi_line && block_like {
+    if height == Height::MultiLine && block_like {
         Kind::BlockLike
     } else {
         Kind::Other
     }
 }
 
-fn item_kind(item: &Item, multi_line: bool) -> Kind {
+fn item_kind(item: &Item, height: Height) -> Kind {
     match item {
         Item::Use(_) => Kind::Use,
-        Item::Const(constant) if !multi_line => Kind::Const {
+        Item::Const(constant) if height == Height::OneLine => Kind::Const {
             public: is_public(&constant.vis),
         },
-        Item::Static(constant) if !multi_line => Kind::Const {
+        Item::Static(constant) if height == Height::OneLine => Kind::Const {
             public: is_public(&constant.vis),
         },
         Item::Fn(_) | Item::Impl(_) | Item::Trait(_) => Kind::ItemBlock,
         Item::Mod(module) if module.content.is_some() => Kind::ItemBlock,
-        _ if multi_line => Kind::ItemBlock,
+        _ if height == Height::MultiLine => Kind::ItemBlock,
         _ => Kind::Other,
     }
 }

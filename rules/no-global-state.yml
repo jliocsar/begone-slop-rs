@@ -1,0 +1,17 @@
+id: no-global-state
+language: Rust
+severity: error
+message: A static with interior mutability is global state. Own it in one place and pass it in.
+note: |
+  Global mutable state couples every caller to every other and makes tests order-dependent.
+  A `static` that's set once and only read (a `LazyLock<Regex>`, a `OnceLock<Config>`) is
+  fine; this rule is about statics that change.
+rule:
+  any:
+    - kind: static_item
+      has:
+        kind: mutable_specifier
+    - kind: static_item
+      has:
+        field: type
+        regex: '\b(Mutex|RwLock|RefCell|Cell|OnceCell|UnsafeCell|Atomic[A-Za-z0-9]+)\b'

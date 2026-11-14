@@ -17,6 +17,11 @@ rule:
         has:
           kind: string_literal
           stopBy: end
+          not:
+            inside:
+              regex: '[\s\S]'
+              field: condition
+              stopBy: end
   not:
     inside:
       stopBy: end

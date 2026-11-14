@@ -7,8 +7,8 @@
 
 use syn::visit::{self, Visit};
 use syn::{
-    BinOp, Block, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprWhile, File, Ident,
-    ImplItemFn, Item, ItemFn, Local, TraitItemFn,
+    BinOp, Block, Expr, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprWhile, File,
+    Ident, ImplItemFn, Item, ItemFn, Local, TraitItemFn,
 };
 
 use super::{Finding, Rule};
@@ -89,7 +89,12 @@ impl<'ast> Visit<'ast> for Branches {
             .iter()
             .filter(|arm| arm.guard.is_some())
             .count();
-        self.count += matching.arms.len().saturating_sub(1) + guards;
+        let lookup = guards == 0 && matching.arms.iter().all(|arm| is_value(&arm.body));
+
+        if !lookup {
+            self.count += matching.arms.len().saturating_sub(1) + guards;
+        }
+
         visit::visit_expr_match(self, matching);
     }
 
@@ -107,6 +112,16 @@ impl<'ast> Visit<'ast> for Branches {
             .is_some_and(|init| init.diverge.is_some());
         self.count += usize::from(diverges);
         visit::visit_local(self, local);
+    }
+}
+
+/// A literal, a path, or a constructor call on values: an arm that looks something up.
+fn is_value(expr: &Expr) -> bool {
+    match expr {
+        Expr::Lit(_) | Expr::Path(_) => true,
+        Expr::Reference(reference) => is_value(&reference.expr),
+        Expr::Call(call) => matches!(&*call.func, Expr::Path(_)) && call.args.iter().all(is_value),
+        _ => false,
     }
 }
 
@@ -143,7 +158,7 @@ mod tests {
     #[test]
     fn match_arms_past_the_first_count() {
         let arms = (0..16)
-            .map(|number| format!("        {number} => go(),\n"))
+            .map(|number| format!("        {number} => go(value).await,\n"))
             .collect::<Vec<_>>()
             .concat();
         let text = format!(
@@ -151,6 +166,19 @@ mod tests {
         );
 
         assert_eq!(lines_of(Rule::Complexity, &text), [1]);
+    }
+
+    #[test]
+    fn a_lookup_match_counts_once() {
+        let arms = (0..30)
+            .map(|number| format!("        {number} => \"name\",\n"))
+            .collect::<Vec<_>>()
+            .concat();
+        let text = format!(
+            "fn name(value: u8) -> &'static str {{\n    match value {{\n{arms}        _ => \"other\",\n    }}\n}}\n"
+        );
+
+        assert_eq!(lines_of(Rule::Complexity, &text), NONE);
     }
 
     #[test]

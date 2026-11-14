@@ -5,8 +5,10 @@ use std::io;
 use std::path::PathBuf;
 use std::process::Command;
 
+use crate::check::Mode;
+
 /// The files in `rules/`, by id. A test keeps this list and the directory equal.
-pub const RULES: [(&str, &str); 10] = [
+pub const RULES: [(&str, &str); 13] = [
     (
         "ignore-needs-reason",
         include_str!("../rules/ignore-needs-reason.yml"),
@@ -23,6 +25,11 @@ pub const RULES: [(&str, &str); 10] = [
         "no-glob-reexport",
         include_str!("../rules/no-glob-reexport.yml"),
     ),
+    (
+        "no-global-state",
+        include_str!("../rules/no-global-state.yml"),
+    ),
+    ("no-rc-refcell", include_str!("../rules/no-rc-refcell.yml")),
     (
         "no-string-error",
         include_str!("../rules/no-string-error.yml"),
@@ -46,6 +53,10 @@ pub const RULES: [(&str, &str); 10] = [
     (
         "todo-needs-issue",
         include_str!("../rules/todo-needs-issue.yml"),
+    ),
+    (
+        "waiver-needs-reason",
+        include_str!("../rules/waiver-needs-reason.yml"),
     ),
 ];
 
@@ -75,14 +86,14 @@ impl std::error::Error for AstGrepError {}
 /// # Errors
 ///
 /// Fails when `ast-grep` is missing or can't be started.
-pub fn scan(paths: &[PathBuf], fix: bool) -> Result<bool, AstGrepError> {
+pub fn scan(paths: &[PathBuf], mode: Mode) -> Result<bool, AstGrepError> {
     let rules: Vec<&str> = RULES.iter().map(|(_, text)| *text).collect();
     let mut command = Command::new("ast-grep");
     command
         .args(["scan", "--inline-rules"])
         .arg(rules.join("\n---\n"));
 
-    if fix {
+    if mode == Mode::Fix {
         command.arg("--update-all");
     }
 
