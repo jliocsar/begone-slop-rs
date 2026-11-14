@@ -6,14 +6,22 @@
 Clippy already polices most of what begone-slop polices in TypeScript, so a lot of this package
 is a clippy preset. The rest is what clippy and rustfmt can't express:
 
-- a syntax engine, built on `syn`, for blank-line padding, cyclomatic complexity, file length and
-  barrel modules, with `--fix`
+- a syntax engine, built on `syn`, for blank-line padding, cyclomatic complexity and barrel
+  modules, with `--fix`
 - ast-grep pattern rules for errors that lose their evidence
 
 ## Install
 
+It isn't on crates.io. Install it from git, pinned to a tag or commit:
+
 ```sh
-cargo install --git https://github.com/jliocsar/begone-slop-rs cargo-bs
+cargo install --locked --git https://github.com/jliocsar/begone-slop-rs --tag v0.1.0 cargo-bs
+```
+
+To pin it per project with [mise](https://mise.jdx.dev), so every checkout gets the same build:
+
+```sh
+mise use 'cargo:https://github.com/jliocsar/begone-slop-rs@tag:v0.1.0'
 ```
 
 The pattern rules run through the [ast-grep](https://ast-grep.github.io) CLI, so it has to be on
@@ -66,7 +74,6 @@ The Effect rules have no Rust counterpart. `no-switch` doesn't port, since `matc
 | `padding`              | missing or extra blank lines between statements and items                             | ✅  |
 | `assert-padding`       | in tests, an assertion run not fenced off by blank lines, or one with blanks inside   | ✅  |
 | `complexity`           | a function with cyclomatic complexity over 15                                         |  —  |
-| `max-lines`            | a file over 1000 lines                                                                |  —  |
 | `reexport-only-module` | a module file that only re-exports (`lib.rs` and `main.rs` are exempt)                |  —  |
 
 `padding` is begone-slop's `padding-line-between-statements` preset, read for Rust:

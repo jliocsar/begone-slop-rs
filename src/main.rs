@@ -12,7 +12,7 @@ usage: cargo bs [--fix] [--no-ast-grep] [PATH...]
        cargo bs init
 
 Checks Rust files with the begone-slop rules: statement padding, assertion padding,
-cyclomatic complexity, file length and barrel modules, then the ast-grep pattern rules.
+cyclomatic complexity and barrel modules, then the ast-grep pattern rules.
 PATH defaults to the current directory.
 
   --fix          rewrite what can be fixed, report the rest

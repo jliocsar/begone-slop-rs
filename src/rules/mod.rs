@@ -3,7 +3,6 @@
 mod assert_padding;
 mod complexity;
 mod gap;
-mod max_lines;
 mod padding;
 mod reexport_only;
 mod unit;
@@ -15,7 +14,6 @@ use crate::source::{Edit, Source};
 pub enum Rule {
     AssertPadding,
     Complexity,
-    MaxLines,
     Padding,
     ReexportOnly,
 }
@@ -26,7 +24,6 @@ impl Rule {
         match self {
             Self::AssertPadding => "assert-padding",
             Self::Complexity => "complexity",
-            Self::MaxLines => "max-lines",
             Self::Padding => "padding",
             Self::ReexportOnly => "reexport-only-module",
         }
@@ -48,7 +45,6 @@ pub fn run(source: &Source, file: &syn::File) -> Vec<Finding> {
     let mut findings = padding::check(source, file);
     findings.extend(assert_padding::check(source, file));
     findings.extend(complexity::check(file));
-    findings.extend(max_lines::check(source));
     findings.extend(reexport_only::check(source, file));
     findings.retain(|finding| !source.waives(finding.line, finding.rule.name()));
     findings.sort_by_key(|finding| finding.line);
