@@ -4,7 +4,7 @@
 //! counts as code when it parses as Rust statements and has code punctuation in it (prose
 //! rarely does both). Doc comments, `SAFETY:` notes and tool directives are never code.
 
-use super::{Finding, Rule};
+use super::{FileContext, Finding, Rule};
 use crate::source::Source;
 
 const CODE_MARKS: [&str; 7] = [";", "{", "}", "=>", "::", "->", "()"];
@@ -23,8 +23,8 @@ struct CommentRun {
     text: String,
 }
 
-pub(super) fn check(source: &Source) -> Vec<Finding> {
-    runs(source)
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
+    runs(file.source)
         .into_iter()
         .filter(|run| looks_like_code(&run.text))
         .map(|run| Finding {

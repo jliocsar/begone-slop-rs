@@ -13,11 +13,11 @@ use std::collections::{HashMap, HashSet};
 use quote::ToTokens;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{Block, Expr, ExprCall, ExprMethodCall, File, ImplItemFn, ItemFn, ItemMod, Macro, UnOp};
+use syn::{Block, Expr, ExprCall, ExprMethodCall, ImplItemFn, ItemFn, Macro, UnOp};
 
 use super::paths::macro_arguments;
-use super::test_scope::{is_test_fn, is_test_module};
-use super::{Context, Finding, Rule};
+use super::test_scope::{TestLines, is_test_fn};
+use super::{FileContext, Finding, Rule};
 
 /// Names that say a test exists but not what it proves.
 const VAGUE_TEST_NAMES: [&str; 4] = ["it_works", "works", "basic", "smoke"];
@@ -25,10 +25,9 @@ const VAGUE_TEST_NAMES: [&str; 4] = ["it_works", "works", "basic", "smoke"];
 const PANICKING_MACROS: [&str; 2] = ["panic", "unreachable"];
 const ASSERTING_PREFIXES: [&str; 3] = ["assert", "debug_assert", "prop_assert"];
 
-struct TestHygiene {
+struct TestHygiene<'run> {
+    tests: &'run TestLines,
     findings: Vec<Finding>,
-    test_file: bool,
-    test_depth: usize,
     asserting: HashSet<String>,
 }
 
@@ -45,11 +44,7 @@ struct Bodies {
     bodies: HashMap<String, Body>,
 }
 
-impl TestHygiene {
-    fn in_tests(&self) -> bool {
-        self.test_file || self.test_depth > 0
-    }
-
+impl TestHygiene<'_> {
     fn name_test(&mut self, function: &ItemFn) {
         let name = function.sig.ident.to_string();
 
@@ -66,9 +61,7 @@ impl TestHygiene {
             edit: None,
         });
     }
-}
 
-impl TestHygiene {
     fn require_assertion(&mut self, function: &ItemFn) {
         let should_panic = function
             .attrs
@@ -178,14 +171,15 @@ impl<'ast> Visit<'ast> for Bodies {
     }
 }
 
-impl<'ast> Visit<'ast> for TestHygiene {
+impl<'ast> Visit<'ast> for TestHygiene<'_> {
     fn visit_expr_call(&mut self, call: &'ast ExprCall) {
         let sleeps = matches!(&*call.func, Expr::Path(callee)
             if callee.path.segments.last().is_some_and(|segment| segment.ident == "sleep"));
+        let line = call.func.span().start().line;
 
-        if self.in_tests() && sleeps {
+        if self.tests.contains(line) && sleeps {
             self.findings.push(Finding {
-                line: call.func.span().start().line,
+                line,
                 rule: Rule::NoSleepInTests,
                 message: "a sleep in a test is a race with the machine's load; wait on the event itself (a channel, a condition, a timeout around the real signal)".to_owned(),
                 edit: None,
@@ -203,16 +197,7 @@ impl<'ast> Visit<'ast> for TestHygiene {
             self.require_assertion(function);
         }
 
-        self.test_depth += usize::from(is_test);
         visit::visit_item_fn(self, function);
-        self.test_depth -= usize::from(is_test);
-    }
-
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let is_test = is_test_module(&module.attrs);
-        self.test_depth += usize::from(is_test);
-        visit::visit_item_mod(self, module);
-        self.test_depth -= usize::from(is_test);
     }
 }
 
@@ -258,16 +243,16 @@ fn is_vague(name: &str) -> bool {
             .is_some_and(|rest| rest.chars().all(|character| character.is_ascii_digit()))
 }
 
-pub(super) fn check(file: &File, context: &Context) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
+    let syntax = file.syntax;
     let mut bodies = Bodies::default();
-    bodies.visit_file(file);
+    bodies.visit_file(syntax);
     let mut hygiene = TestHygiene {
+        tests: &file.tests,
         findings: Vec::new(),
-        test_file: context.in_tests(),
-        test_depth: 0,
         asserting: bodies.asserting(),
     };
-    hygiene.visit_file(file);
+    hygiene.visit_file(syntax);
 
     hygiene.findings
 }

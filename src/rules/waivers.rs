@@ -12,15 +12,15 @@
 //! (`// ast-grep-ignore: no-catch-unwind -- the FFI boundary must not unwind`), right above
 //! the code it waives. The check runs here, not as a pattern rule, so ast-grep can't waive it.
 
-use super::{Finding, Rule};
+use super::{FileContext, Finding, Rule};
 use crate::ast_grep::RULES;
 use crate::source::{Comment, CommentKind, MIN_REASON_WORDS, Source, is_real_reason};
 
 const BS_ALLOW: &str = "bs-allow";
 const AST_GREP_IGNORE: &str = "ast-grep-ignore";
 
-pub(super) fn check(source: &Source) -> Vec<Finding> {
-    source
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
+    file.source
         .comments
         .iter()
         .filter_map(|comment| {
@@ -28,7 +28,7 @@ pub(super) fn check(source: &Source) -> Vec<Finding> {
             let problem = if body.starts_with(BS_ALLOW) {
                 bs_allow_problem(comment, body)
             } else if body.starts_with(AST_GREP_IGNORE) {
-                ignore_problem(source, comment, body)
+                ignore_problem(file.source, comment, body)
             } else {
                 None
             }?;

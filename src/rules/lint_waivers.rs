@@ -13,11 +13,11 @@ use std::sync::LazyLock;
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
-use syn::{AttrStyle, Attribute, ItemFn, ItemMod, Macro, Meta, MetaList, Token};
+use syn::{AttrStyle, Attribute, ItemMod, Macro, Meta, MetaList, Token};
 
 use super::paths::segments;
-use super::test_scope::{is_test_fn, is_test_module};
-use super::{Context, Finding, Rule};
+use super::test_scope::TestLines;
+use super::{FileContext, Finding, Rule};
 use crate::lints::{self, Level};
 use crate::preset;
 
@@ -76,13 +76,12 @@ enum Placement {
     Macro,
 }
 
-struct LintWaivers {
+struct LintWaivers<'run> {
+    tests: &'run TestLines,
     findings: Vec<Finding>,
-    test_file: bool,
-    test_depth: usize,
 }
 
-impl LintWaivers {
+impl LintWaivers<'_> {
     fn push(&mut self, line: usize, rule: Rule, message: String) {
         self.findings.push(Finding {
             line,
@@ -93,7 +92,7 @@ impl LintWaivers {
     }
 
     fn check_levels(&mut self, line: usize, list: &MetaList) {
-        if self.test_file || self.test_depth > 0 {
+        if self.tests.contains(line) {
             return;
         }
 
@@ -168,22 +167,12 @@ impl LintWaivers {
     }
 }
 
-impl<'ast> Visit<'ast> for LintWaivers {
+impl<'ast> Visit<'ast> for LintWaivers<'_> {
     fn visit_attribute(&mut self, attribute: &'ast Attribute) {
         self.check_attribute(attribute, Placement::Item);
     }
 
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        let is_test = is_test_fn(&function.attrs);
-        self.test_depth += usize::from(is_test);
-        visit::visit_item_fn(self, function);
-        self.test_depth -= usize::from(is_test);
-    }
-
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let is_test = is_test_module(&module.attrs);
-        self.test_depth += usize::from(is_test);
-
         for attribute in &module.attrs {
             self.check_attribute(attribute, Placement::Module);
         }
@@ -191,8 +180,6 @@ impl<'ast> Visit<'ast> for LintWaivers {
         for item in module.content.iter().flat_map(|(_, items)| items) {
             self.visit_item(item);
         }
-
-        self.test_depth -= usize::from(is_test);
     }
 
     fn visit_macro(&mut self, mac: &'ast Macro) {
@@ -274,13 +261,12 @@ fn attributes_in(tokens: TokenStream) -> Vec<(usize, Meta)> {
     found
 }
 
-pub(super) fn check(file: &syn::File, context: &Context) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut waivers = LintWaivers {
+        tests: &file.tests,
         findings: Vec::new(),
-        test_file: context.in_tests(),
-        test_depth: 0,
     };
-    waivers.visit_file(file);
+    waivers.visit_file(file.syntax);
 
     waivers.findings
 }

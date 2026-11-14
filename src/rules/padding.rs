@@ -10,7 +10,7 @@ use syn::{Block, File, ItemImpl, ItemMod, ItemTrait};
 
 use super::gap::{forbid_blank, require_blank};
 use super::unit::{Kind, Unit};
-use super::{Finding, Rule};
+use super::{FileContext, Finding, Rule};
 use crate::source::Source;
 
 enum Blank {
@@ -94,12 +94,12 @@ fn expected(previous: Kind, next: Kind) -> Blank {
     }
 }
 
-pub(super) fn check(source: &Source, file: &File) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut padding = Padding {
-        source,
+        source: file.source,
         findings: Vec::new(),
     };
-    padding.visit_file(file);
+    padding.visit_file(file.syntax);
 
     padding.findings
 }

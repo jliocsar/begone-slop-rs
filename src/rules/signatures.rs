@@ -12,12 +12,12 @@ use std::collections::HashMap;
 
 use syn::visit::{self, Visit};
 use syn::{
-    Field, FnArg, GenericArgument, ImplItemFn, Item, ItemFn, ItemImpl, ItemMod, Pat, PathArguments,
+    Field, FnArg, GenericArgument, ImplItemFn, Item, ItemFn, ItemImpl, Pat, PathArguments,
     Signature, TraitItemFn, Type,
 };
 
-use super::test_scope::{is_test_fn, is_test_module};
-use super::{Context, Finding, Rule};
+use super::test_scope::TestLines;
+use super::{FileContext, Finding, Rule};
 
 const RAW_ID_TYPES: [&str; 17] = [
     "String", "str", "Uuid", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64",
@@ -46,8 +46,7 @@ struct Aliases<'file> {
 struct Signatures<'file> {
     aliases: Aliases<'file>,
     findings: Vec<Finding>,
-    test_file: bool,
-    test_depth: usize,
+    tests: &'file TestLines,
     in_trait_impl: bool,
     in_id_impl: bool,
 }
@@ -93,12 +92,8 @@ impl<'file> Aliases<'file> {
 }
 
 impl Signatures<'_> {
-    fn skipped(&self) -> bool {
-        self.test_file || self.test_depth > 0
-    }
-
     fn signature(&mut self, signature: &Signature) {
-        if self.skipped() || self.in_trait_impl {
+        if self.tests.contains(signature.fn_token.span.start().line) || self.in_trait_impl {
             return;
         }
 
@@ -177,7 +172,7 @@ impl Signatures<'_> {
 impl<'ast> Visit<'ast> for Signatures<'_> {
     fn visit_field(&mut self, field: &'ast Field) {
         if let Some(ident) = &field.ident
-            && !self.skipped()
+            && !self.tests.contains(ident.span().start().line)
         {
             self.id(&ident.to_string(), &field.ty, ident.span().start().line);
             self.category(&ident.to_string(), &field.ty, ident.span().start().line);
@@ -192,11 +187,8 @@ impl<'ast> Visit<'ast> for Signatures<'_> {
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        let is_test = is_test_fn(&function.attrs);
-        self.test_depth += usize::from(is_test);
         self.signature(&function.sig);
         visit::visit_item_fn(self, function);
-        self.test_depth -= usize::from(is_test);
     }
 
     fn visit_item_impl(&mut self, implementation: &'ast ItemImpl) {
@@ -206,13 +198,6 @@ impl<'ast> Visit<'ast> for Signatures<'_> {
             if path.path.segments.last().is_some_and(|segment| segment.ident.to_string().ends_with("Id")));
         visit::visit_item_impl(self, implementation);
         (self.in_trait_impl, self.in_id_impl) = outer;
-    }
-
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let is_test = is_test_module(&module.attrs);
-        self.test_depth += usize::from(is_test);
-        visit::visit_item_mod(self, module);
-        self.test_depth -= usize::from(is_test);
     }
 
     fn visit_trait_item_fn(&mut self, method: &'ast TraitItemFn) {
@@ -312,18 +297,18 @@ fn collected<'ty>(ty: &'ty Type, aliases: &Aliases<'ty>) -> Option<&'ty Type> {
     }
 }
 
-pub(super) fn check(file: &syn::File, context: &Context) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
+    let syntax = file.syntax;
     let mut signatures = Signatures {
         aliases: Aliases {
-            by_name: Aliases::of(&file.items),
+            by_name: Aliases::of(&syntax.items),
         },
         findings: Vec::new(),
-        test_file: context.in_tests(),
-        test_depth: 0,
+        tests: &file.tests,
         in_trait_impl: false,
         in_id_impl: false,
     };
-    signatures.visit_file(file);
+    signatures.visit_file(syntax);
 
     signatures.findings
 }

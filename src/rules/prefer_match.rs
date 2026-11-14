@@ -10,7 +10,7 @@ use quote::ToTokens;
 use syn::visit::{self, Visit};
 use syn::{BinOp, Expr, ExprIf, ImplItemFn, ItemFn, ItemImpl, Lit};
 
-use super::{Finding, Rule};
+use super::{FileContext, Finding, Rule};
 
 const MIN_BRANCHES: usize = 3;
 const PARSE_PREFIXES: [&str; 2] = ["from_", "parse"];
@@ -164,12 +164,12 @@ fn is_fixed(expr: &Expr) -> bool {
     matches!(expr, Expr::Lit(_) | Expr::Path(_))
 }
 
-pub(super) fn check(file: &syn::File) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut prefer_match = PreferMatch {
         findings: Vec::new(),
         parse_depth: 0,
     };
-    prefer_match.visit_file(file);
+    prefer_match.visit_file(file.syntax);
 
     prefer_match.findings
 }

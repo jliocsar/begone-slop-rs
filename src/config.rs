@@ -127,15 +127,4 @@ impl Config {
             layers.crate_root = plain(&layers.crate_root);
         }
     }
-
-    /// `path` relative to the config's root, the form `bs.toml` paths are written in.
-    #[must_use]
-    pub fn relative(&self, path: &Path) -> Option<PathBuf> {
-        let absolute = path.canonicalize().ok()?;
-
-        absolute
-            .strip_prefix(&self.root)
-            .ok()
-            .map(Path::to_path_buf)
-    }
 }

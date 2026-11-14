@@ -9,28 +9,29 @@
 //! in tests and costs nothing in release.
 
 use syn::visit::{self, Visit};
-use syn::{ExprConst, ImplItemConst, ItemConst, ItemFn, ItemMod, ItemStatic, Macro};
+use syn::{ExprConst, ImplItemConst, ItemConst, ItemStatic, Macro};
 
-use super::test_scope::{is_test_fn, is_test_module};
-use super::{Context, Finding, Role, Rule};
+use super::test_scope::TestLines;
+use super::{FileContext, Finding, Role, Rule};
 
 const PANICKING_ASSERTS: [&str; 3] = ["assert", "assert_eq", "assert_ne"];
 
-struct PanicBypass {
+struct PanicBypass<'run> {
+    tests: &'run TestLines,
     findings: Vec<Finding>,
-    /// Inside test code or a `const` context, where an assertion is fine.
-    exempt_depth: usize,
+    /// Inside a `const` context, where an assertion fails the build, not the program.
+    const_depth: usize,
 }
 
-impl PanicBypass {
+impl PanicBypass<'_> {
     fn exempt(&mut self, walk: impl FnOnce(&mut Self)) {
-        self.exempt_depth += 1;
+        self.const_depth += 1;
         walk(self);
-        self.exempt_depth -= 1;
+        self.const_depth -= 1;
     }
 }
 
-impl<'ast> Visit<'ast> for PanicBypass {
+impl<'ast> Visit<'ast> for PanicBypass<'_> {
     fn visit_expr_const(&mut self, block: &'ast ExprConst) {
         self.exempt(|check| visit::visit_expr_const(check, block));
     }
@@ -41,22 +42,6 @@ impl<'ast> Visit<'ast> for PanicBypass {
 
     fn visit_item_const(&mut self, constant: &'ast ItemConst) {
         self.exempt(|check| visit::visit_item_const(check, constant));
-    }
-
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        if is_test_fn(&function.attrs) {
-            self.exempt(|check| visit::visit_item_fn(check, function));
-        } else {
-            visit::visit_item_fn(self, function);
-        }
-    }
-
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        if is_test_module(&module.attrs) {
-            self.exempt(|check| visit::visit_item_mod(check, module));
-        } else {
-            visit::visit_item_mod(self, module);
-        }
     }
 
     fn visit_item_static(&mut self, item: &'ast ItemStatic) {
@@ -70,10 +55,16 @@ impl<'ast> Visit<'ast> for PanicBypass {
             .last()
             .map(|segment| segment.ident.to_string())
             .unwrap_or_default();
+        let line = invocation
+            .path
+            .segments
+            .first()
+            .map_or(0, |segment| segment.ident.span().start().line);
+        let exempt = self.const_depth > 0 || self.tests.contains(line);
 
-        if self.exempt_depth == 0 && PANICKING_ASSERTS.contains(&name.as_str()) {
+        if !exempt && PANICKING_ASSERTS.contains(&name.as_str()) {
             self.findings.push(Finding {
-                line: invocation.path.segments.first().map_or(0, |segment| segment.ident.span().start().line),
+                line,
                 rule: Rule::NoPanicBypass,
                 message: format!("`{name}!` panics in shipped code like the `panic!` the preset bans; return an error, or use `debug_assert!` for an invariant"),
                 edit: None,
@@ -84,16 +75,17 @@ impl<'ast> Visit<'ast> for PanicBypass {
     }
 }
 
-pub(super) fn check(file: &syn::File, context: &Context) -> Vec<Finding> {
-    if !matches!(context.role, Role::Library | Role::Binary) {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
+    if !matches!(file.role, Role::Library | Role::Binary) {
         return Vec::new();
     }
 
     let mut bypass = PanicBypass {
+        tests: &file.tests,
         findings: Vec::new(),
-        exempt_depth: 0,
+        const_depth: 0,
     };
-    bypass.visit_file(file);
+    bypass.visit_file(file.syntax);
 
     bypass.findings
 }

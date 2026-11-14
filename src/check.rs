@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use crate::config::Config;
 use crate::module_paths::normalize;
-use crate::rules::{self, Context, Finding, Role};
+use crate::rules::{self, Context, FileContext, Finding, Role};
 use crate::source::Source;
 use crate::{files, tree};
 
@@ -98,7 +98,8 @@ impl Project {
     }
 
     /// What the rules need to know about `path`: its role comes from the module tree, else
-    /// from where it sits in its crate.
+    /// from where it sits in its crate. Its path from the root is resolved here, once, so the
+    /// rules never touch the disk.
     #[must_use]
     pub fn context(&self, path: &Path) -> Context<'_> {
         let absolute = normalize(&self.base.join(path));
@@ -109,10 +110,16 @@ impl Project {
                 .map_or(Role::Library, Role::from_path)
         });
 
+        let relative = path
+            .canonicalize()
+            .ok()
+            .and_then(|real| Some(real.strip_prefix(&self.config.root).ok()?.to_path_buf()));
+
         Context {
             config: &self.config,
             role,
             absolute,
+            relative,
             listed: &self.listed,
         }
     }
@@ -177,7 +184,7 @@ pub fn findings_in(source: &Source, context: &Context) -> Result<Vec<Finding>, C
         path: source.path.clone(),
         cause,
     })?;
-    let findings = rules::run(source, &file, context);
+    let findings = rules::run(&FileContext::new(source, &file, context));
     proc_macro2::extra::invalidate_current_thread_spans();
 
     Ok(findings)

@@ -16,7 +16,7 @@ use syn::{
 };
 
 use super::abbreviations::words;
-use super::{Finding, Rule};
+use super::{FileContext, Finding, Rule};
 
 /// `x0`, `y1`, `p2`: a short base and a number is an index, not a copy.
 const MAX_COORDINATE_LETTERS: usize = 2;
@@ -208,12 +208,12 @@ fn numbered_base(name: &str) -> Option<&str> {
     (!number.is_empty() && !part_of_the_name).then_some(base)
 }
 
-pub(super) fn check(file: &syn::File) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut names = Names {
         findings: Vec::new(),
         in_trait_impl: false,
     };
-    names.visit_file(file);
+    names.visit_file(file.syntax);
 
     names.findings
 }
