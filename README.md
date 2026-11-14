@@ -72,10 +72,15 @@ The quickest way past a lint gate is to weaken the gate, so `cargo bs` checks th
 Both are checked from the project's root: the workspace that includes the crate `cargo bs` runs
 in, so running it from a member crate checks the same thing. There's no waiver for either.
 - `no-forbidden-expects`: outside tests, the lints that guard the gate can't be waived at all, not
-  even with a reason: `unwrap_used`, `expect_used`, `panic`, `todo`, `dead_code`, `unused*`,
-  `unsafe_code`, `allow_attributes`, `clippy::all`, `clippy::pedantic`, `warnings` and a few more.
-- `no-crate-level-allow`: no `#![allow]`/`#![expect]` for a whole file or module, and no waiver
-  behind `cfg_attr`.
+  even with a reason: `unwrap_used`, `expect_used`, `panic`, `todo`, `unreachable`, `exit`,
+  `dead_code`, `unsafe_code`, `allow_attributes` and a few more; every lint the preset turns on
+  by name; every group (`clippy::restriction`, `clippy::style`, `warnings`, `nonstandard_style`…,
+  since a group waives its members); the whole `unused*` family; and `renamed_and_removed_lints`
+  and `unknown_lints`. An old name (`clippy::option_unwrap_used`) counts as its current one.
+- `no-crate-level-allow`: no `#![allow]`/`#![expect]` for a whole file or module, none on a `mod`
+  (`#[allow(..)] mod big;` waives a whole file), none behind `cfg_attr` at any depth, and none
+  written inside a macro (`macro_rules!` bodies and invocations), where it lands on code nobody
+  sees.
 - `no-hidden-code`: `#[path = "core.inc"] mod core;` and `include!("more.in")` compile code that
   no rule reads, and so does either one pointing at a `.rs` file git doesn't list. Only Cargo's
   generated-code idiom, `include!(concat!(env!("OUT_DIR"), ...))`, passes.
