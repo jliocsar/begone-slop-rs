@@ -1,0 +1,14 @@
+//! Lines that start with `//` inside a string or a block comment aren't comments.
+
+const FIXTURE: &str = r#"
+// let old = legacy(input);
+// old.flush();
+"#;
+
+/*
+// let old = legacy(input);
+// old.flush();
+*/
+fn run() {
+    go(); // let old = legacy(input);
+}

@@ -1,0 +1,6 @@
+//@ path: src/utils.rs //~ no-junk-drawer-modules
+//! Odds and ends.
+
+pub fn trim(text: &str) -> &str {
+    text.trim()
+}

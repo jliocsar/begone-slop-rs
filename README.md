@@ -307,6 +307,14 @@ guards the gate, whether `--fix` fixes it), and its check is one more entry in `
 pattern rule is one more id in `ast_grep::RULES`. Tests fail when this README's rule tables and
 lists don't match them.
 
+Rule behaviour is pinned by fixtures: `tests/fixtures/<rule>/<case>.rs.fixture` is a Rust file
+whose flagged lines end in `//~ <rule>` (a first line `//@ path: src/x.rs` says where it pretends
+to live, and a `bs.toml` beside it is its config). `tests/fixtures.rs` runs every one: the rules
+must report exactly the marked lines, and `--fix` must settle, so fixing the fixed text again
+changes nothing. The `.rs.fixture` extension keeps the gate, which lints every `.rs` file git
+lists, off the slop they hold on purpose. To turn a repro into a regression test, drop it in and
+mark its lines.
+
 ```sh
 git config core.hooksPath .githooks   # the gate on every commit
 scripts/check                         # fmt, clippy, tests, cargo bs, ast-grep tests

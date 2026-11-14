@@ -1,0 +1,39 @@
+//! Naming loopholes.
+
+mod cfg {}
+
+struct Parser<Ctx> {
+    msgs: Vec<String>,
+    attrs: Vec<String>,
+    buf2: Vec<u8>,
+    context: Ctx,
+}
+
+impl Parser<()> {
+    const MAX_IDX: usize = 3;
+    type Elem = u8; //~ padding
+}
+
+fn handle_event(errs: Vec<String>, cfgs: &[u8]) {}
+
+fn handle_event2() {}
+
+fn handle_event_v2() {}
+
+fn handle_event_new() {}
+
+struct Config2;
+
+struct Config;
+
+fn naming(name_string: String, user_list: Vec<u8>, id_map: u8, flag_bool: bool, maybe_opt: Option<u8>) { //~ no-boolean-trap
+    let ipv4 = 1;
+    let ipv6 = 2;
+    let base32 = 1;
+    let base64 = 2;
+}
+
+fn the_message() {
+    let buf = 1; //~ no-abbreviations
+    let res = 2; //~ no-abbreviations
+}

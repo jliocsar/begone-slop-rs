@@ -174,12 +174,11 @@ impl Config {
             Err(cause) => return Err(ConfigError::Read { path, cause }),
         };
 
-        let mut config: Self = toml::from_str(&text).map_err(|cause| ConfigError::Parse {
+        let config = Self::parse(&text, root).map_err(|cause| ConfigError::Parse {
             path: path.clone(),
             cause,
         })?;
-        config.root = root;
-        config.normalize();
+
         config.problem().map_or(Ok(config), |(entry, problem)| {
             Err(ConfigError::Invalid {
                 path,
@@ -187,6 +186,20 @@ impl Config {
                 problem,
             })
         })
+    }
+
+    /// Parses `bs.toml`'s text as the config of a project at `root`, without checking that
+    /// its entries exist: that's [`Config::load`]'s job, which reads the disk.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the text isn't a valid `bs.toml`.
+    pub fn parse(text: &str, root: PathBuf) -> Result<Self, toml::de::Error> {
+        let mut config: Self = toml::from_str(text)?;
+        config.root = root;
+        config.normalize();
+
+        Ok(config)
     }
 
     /// `./src` and `src` mean the same directory; paths are compared component by component.

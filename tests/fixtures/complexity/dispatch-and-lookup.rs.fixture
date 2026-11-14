@@ -1,0 +1,42 @@
+//! A dispatch match counted as a lookup table.
+
+fn dispatch(command: Command) -> Outcome { //~ complexity
+    match command {
+        Command::Op0(arg) => handle_op0(arg),
+        Command::Op1(arg) => handle_op1(arg),
+        Command::Op2(arg) => handle_op2(arg),
+        Command::Op3(arg) => handle_op3(arg),
+        Command::Op4(arg) => handle_op4(arg),
+        Command::Op5(arg) => handle_op5(arg),
+        Command::Op6(arg) => handle_op6(arg),
+        Command::Op7(arg) => handle_op7(arg),
+        Command::Op8(arg) => handle_op8(arg),
+        Command::Op9(arg) => handle_op9(arg),
+        Command::Op10(arg) => handle_op10(arg),
+        Command::Op11(arg) => handle_op11(arg),
+        Command::Op12(arg) => handle_op12(arg),
+        Command::Op13(arg) => handle_op13(arg),
+        Command::Op14(arg) => handle_op14(arg),
+        Command::Op15(arg) => handle_op15(arg),
+        Command::Op16(arg) => handle_op16(arg),
+        Command::Op17(arg) => handle_op17(arg),
+        Command::Op18(arg) => handle_op18(arg),
+        Command::Op19(arg) => handle_op19(arg),
+        Command::Op20(arg) => handle_op20(arg),
+        Command::Op21(arg) => handle_op21(arg),
+        Command::Op22(arg) => handle_op22(arg),
+        Command::Op23(arg) => handle_op23(arg),
+        Command::Op24(arg) => handle_op24(arg),
+        Command::Op25(arg) => handle_op25(arg),
+        Command::Op26(arg) => handle_op26(arg),
+        Command::Op27(arg) => handle_op27(arg),
+        Command::Op28(arg) => handle_op28(arg),
+        Command::Op29(arg) => handle_op29(arg),
+    }
+}
+
+fn hidden_branches(ready: bool, items: &[u8]) -> Option<u8> { //~ no-boolean-trap
+    let first = items.first().copied().filter(|item| *item > 3).map_or(Some(0), |item| (item > 9).then(|| item * 2));
+    let second = ready.then(|| items.len() as u8).unwrap_or_else(|| items.iter().copied().find(|item| *item == 1).unwrap_or(7));
+    first.or(second).and_then(|value| (value != 4).then_some(value)).xor(items.last().copied().filter(|last| *last != 0))
+}

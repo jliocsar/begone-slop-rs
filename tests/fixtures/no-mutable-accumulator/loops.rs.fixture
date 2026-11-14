@@ -1,0 +1,61 @@
+//! Accumulator loopholes.
+
+fn names_for_each(users: &[User]) -> Vec<String> {
+    let mut names = Vec::new();
+    users.iter().for_each(|user| names.push(user.name.clone()));
+
+    names
+}
+
+fn names_gap(users: &[User]) -> Vec<String> {
+    let mut names = Vec::new();
+    let prefix = "user:";
+
+    for user in users {
+        names.push(format!("{prefix}{}", user.name));
+    }
+
+    names
+}
+
+fn names_default(users: &[User]) -> Vec<String> {
+    let mut names: Vec<String> = Vec::default();
+
+    for user in users {
+        names.push(user.name.clone());
+    }
+
+    names
+}
+
+fn drain(mut queue: Queue) -> Vec<u8> {
+    let mut items = Vec::new();
+
+    while let Some(item) = queue.pop() {
+        items.push(item);
+    }
+
+    items
+}
+
+fn any_active(users: &[User]) -> bool {
+    let mut found = false;
+
+    for user in users {
+        if user.active {
+            found = true;
+        }
+    }
+
+    found
+}
+
+fn text(parts: &[&str]) -> String {
+    let mut out = String::new();
+
+    for part in parts {
+        write!(out, "{part},");
+    }
+
+    out
+}

@@ -1,0 +1,4 @@
+// ast-grep-ignore: no-string-error -- legacy code kept as is //~ module-doc, waiver-needs-reason
+
+fn one() -> Result<u8, String> { todo() }
+fn two() -> Result<u8, String> { todo() } //~ padding

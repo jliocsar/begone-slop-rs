@@ -1,0 +1,13 @@
+//! A parent module re-exporting its children.
+
+mod attention;
+mod effect;
+
+use std::fmt;
+
+use serde::Serialize;
+
+pub use attention::Notice;
+pub use effect::Effect;
+
+use crate::config::Config;

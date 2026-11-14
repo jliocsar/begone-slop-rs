@@ -1,0 +1,40 @@
+//! Waiver bypasses.
+// bs-allow(no-crate-level-allow): legacy module //~ waiver-needs-reason
+#![allow(clippy::pedantic)] //~ no-crate-level-allow, no-forbidden-expects
+
+// bs-allow(no-forbidden-expects): the loader is fine //~ waiver-needs-reason
+#[expect(clippy::unwrap_used, reason = "it's fine")] //~ no-forbidden-expects
+fn load() -> u8 {
+    "1".parse().unwrap()
+}
+
+#[allow(clippy::restriction)] //~ no-forbidden-expects
+fn restriction_group() {}
+
+#[allow(clippy::style, clippy::complexity, clippy::suspicious, clippy::perf, clippy::correctness)] //~ no-forbidden-expects, no-forbidden-expects, no-forbidden-expects, no-forbidden-expects, no-forbidden-expects
+fn every_default_group() {}
+
+#[allow(renamed_and_removed_lints, clippy::option_unwrap_used, clippy::result_unwrap_used)] //~ no-forbidden-expects, no-forbidden-expects, no-forbidden-expects
+fn old_names() {}
+
+#[allow(clippy::panic_in_result_fn, clippy::unwrap_in_result, clippy::let_underscore_must_use, clippy::map_err_ignore, unreachable_pub, unused_results, unused_assignments)] //~ no-forbidden-expects, no-forbidden-expects, no-forbidden-expects, no-forbidden-expects, no-forbidden-expects, no-forbidden-expects, no-forbidden-expects
+fn preset_lints_not_guarded() {}
+
+#[cfg_attr(all(), cfg_attr(all(), allow(dead_code)))] //~ no-crate-level-allow, no-forbidden-expects
+fn nested_cfg_attr() {} //~ no-abbreviations
+
+macro_rules! quiet {
+    ($item:item) => {
+        #[allow(clippy::unwrap_used, dead_code)] //~ no-crate-level-allow, no-forbidden-expects, no-forbidden-expects
+        $item
+    };
+}
+
+quiet! {
+    fn hidden() -> u8 {
+        "1".parse().unwrap()
+    }
+}
+
+#[allow(clippy::too_many_lines, clippy::cognitive_complexity)] //~ no-crate-level-allow
+mod big;

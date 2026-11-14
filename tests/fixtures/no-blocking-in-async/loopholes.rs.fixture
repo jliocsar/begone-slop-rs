@@ -1,0 +1,29 @@
+//! Blocking inside async: loopholes and false alarms.
+
+async fn read_all(paths: &[PathBuf]) -> Vec<String> {
+    paths
+        .iter()
+        .map(|path| std::fs::read_to_string(path).unwrap_or_default()) //~ no-blocking-in-async
+        .collect()
+}
+
+async fn in_macro(path: &Path) {
+    println!("{}", std::fs::read_to_string(path).unwrap_or_default()); //~ no-blocking-in-async
+}
+
+trait Store {
+    async fn load(&self) -> String {
+        std::fs::read_to_string("x").unwrap_or_default() //~ no-blocking-in-async
+    }
+}
+
+async fn channels(receiver: std::sync::mpsc::Receiver<u8>, lock: &std::sync::Mutex<u8>) {
+    let value = receiver.recv();
+    let guard = futures::executor::block_on(fetch());
+    let handle = std::thread::spawn(work).join();
+}
+
+async fn connect(address: std::net::SocketAddr) {
+    let parsed: std::net::IpAddr = "127.0.0.1".parse().unwrap();
+    tokio::net::TcpStream::connect(address).await;
+}

@@ -1,0 +1,15 @@
+//! The pure core asking the disk through `Path` methods.
+
+use std::path::Path;
+
+fn find(path: &Path) -> bool {
+    let real = path.canonicalize(); //~ io-boundary
+
+    path.exists() //~ io-boundary
+        && Path::is_dir(path) //~ io-boundary
+        && path.metadata().is_ok_and(|meta| meta.is_file()) //~ io-boundary
+}
+
+fn kind(entry: &Entry) -> bool {
+    entry.file_type().is_ok_and(|kind| kind.is_dir())
+}

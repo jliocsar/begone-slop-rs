@@ -1,0 +1,17 @@
+//! Commented-out code loopholes.
+
+fn run() {
+    /* let old = legacy(input);
+    old.flush(); */
+    go();
+
+    // Old version, kept for reference:
+    // let old = legacy(input);
+    // old.flush();
+    go();
+
+    // TODO(#12): restore once the server is back
+    // let old = legacy(input);
+    // old.flush();
+    go();
+}

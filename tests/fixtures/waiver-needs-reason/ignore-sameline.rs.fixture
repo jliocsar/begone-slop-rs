@@ -1,0 +1,1 @@
+fn one() -> Result<u8, String> { todo() } // ast-grep-ignore //~ module-doc, waiver-needs-reason
