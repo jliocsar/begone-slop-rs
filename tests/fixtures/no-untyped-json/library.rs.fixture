@@ -1,0 +1,8 @@
+//@ path: src/wire.rs
+//! Library code holds a parsed type, never a raw value.
+
+use serde_json::Value; //~ no-untyped-json
+
+pub fn read(event: serde_json::Value) -> Value { //~ no-untyped-json
+    event
+}

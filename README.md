@@ -279,7 +279,7 @@ fn key_name(key: Key) -> &'static str {
 | `no-stringified-error` | `.map_err(\|e\| e.to_string())`, `format!` and friends            |
 | `no-catch-unwind`      | `catch_unwind` used as try/catch                                  |
 | `no-glob-reexport`     | `pub use module::*`                                               |
-| `no-untyped-json`      | `serde_json::Value`, the `unknown` of Rust                        |
+| `no-untyped-json`      | `serde_json::Value`, the `unknown` of Rust, outside tests         |
 | `no-stringly-match`    | string-literal match arms outside a parse (`FromStr`, `TryFrom`, `parse*`, `from_*`) |
 | `no-swallowed-parse`   | `.parse().unwrap_or(…)` and friends: bad input becomes a default  |
 | `todo-needs-issue`     | `TODO`/`FIXME`/`XXX`/`HACK` without `(ABC-123)`, `(#12)` or a URL |

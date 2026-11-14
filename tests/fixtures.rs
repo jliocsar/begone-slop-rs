@@ -10,6 +10,9 @@
 //! The rules have to report exactly the marked lines, nothing more. And fixing a fixture has to
 //! settle: the fixed text still parses, and fixing it again changes nothing.
 //!
+//! A fixture in a directory named after a pattern rule also runs that rule through `ast-grep`,
+//! on a copy placed at its path, so the rule's path ignores apply as they do in a project.
+//!
 //! A fixture records what the rules report today. Many come from audit repros, so a few still
 //! hold a loophole a rule misses (`loopholes.rs.fixture`); closing one means adding its marker.
 
@@ -17,7 +20,9 @@ use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
+use cargo_bs::ast_grep::RULES;
 use cargo_bs::check;
 use cargo_bs::config::Config;
 use cargo_bs::rules::{Context, Role};
@@ -28,6 +33,9 @@ const MARKER: &str = "//~";
 const PATH_DIRECTIVE: &str = "//@ path:";
 const DEFAULT_PATH: &str = "src/sample.rs";
 const PROJECT: &str = "/project";
+
+/// Every kind of ignore file ast-grep would otherwise honour, as `cargo bs` turns them off.
+const NO_IGNORE: [&str; 6] = ["dot", "exclude", "global", "hidden", "parent", "vcs"];
 
 /// One fixture, read: its code with the markers taken out, where it pretends to live, its
 /// config, and the `(line, rule)` pairs its markers expect.
@@ -115,6 +123,57 @@ impl Fixture {
         Ok(found)
     }
 
+    /// What the pattern rule this fixture's directory is named after reports, as `(line, rule)`
+    /// pairs. Nothing when the directory isn't a pattern rule.
+    fn patterns_found(&self) -> io::Result<Vec<(usize, String)>> {
+        let Some(directory) = self.file.parent().and_then(Path::file_name) else {
+            return Ok(Vec::new());
+        };
+
+        let Some((_, rule)) = RULES.iter().find(|(id, _)| directory == *id) else {
+            return Ok(Vec::new());
+        };
+
+        let case = self.file.file_name().unwrap_or_default();
+        let root = Path::new(env!("CARGO_TARGET_TMPDIR"))
+            .join("fixtures")
+            .join(directory)
+            .join(case);
+        let copy = root.join(&self.path);
+        fs::create_dir_all(copy.parent().unwrap_or(&root))?;
+        fs::write(&copy, &self.text)?;
+        fs::write(root.join("empty.yml"), "")?;
+
+        let mut command = Command::new("ast-grep");
+        command
+            .current_dir(&root)
+            .args(["scan", "--config", "empty.yml", "--format", "github"])
+            .args(["--inline-rules", rule]);
+
+        for ignore in NO_IGNORE {
+            command.args(["--no-ignore", ignore]);
+        }
+
+        let output = command.arg("--").arg(&self.path).output()?;
+
+        Ok(String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter_map(|line| {
+                // `::<level> file=..,line=..,title=<rule>::<message>`
+                let (_level, rest) = line.strip_prefix("::")?.split_once(' ')?;
+                let fields = rest.split("::").next()?;
+
+                let field = |name: &str| {
+                    fields
+                        .split(',')
+                        .find_map(|field| field.strip_prefix(name)?.strip_prefix('='))
+                };
+
+                Some((field("line")?.parse().ok()?, field("title")?.to_owned()))
+            })
+            .collect())
+    }
+
     /// `text` after `--fix`, or why the fixes didn't settle.
     fn fixed(&self, text: &str) -> Result<String, check::CheckError> {
         let listed = HashSet::new();
@@ -152,7 +211,9 @@ fn every_fixture_reports_exactly_its_marked_lines() {
     let wrong: Vec<String> = fixtures
         .iter()
         .filter_map(|fixture| {
-            let found = fixture.found().unwrap();
+            let mut found = fixture.found().unwrap();
+            found.extend(fixture.patterns_found().unwrap());
+            found.sort();
 
             (found != fixture.expected).then(|| {
                 format!(

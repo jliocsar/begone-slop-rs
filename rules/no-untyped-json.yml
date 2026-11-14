@@ -5,10 +5,14 @@ message: '`serde_json::Value` is a value nobody parsed. Deserialize into a type 
 note: |
   Keep unknown fields with `#[serde(flatten)]` into a map, or an `Other` variant, when the
   protocol requires keeping them. Waive the rare real case with
-  `// ast-grep-ignore: no-untyped-json` and a reason.
+  `// ast-grep-ignore: no-untyped-json` and a reason. Tests are exempt: they build the raw
+  messages a parser is fed.
 rule:
   any:
     - kind: scoped_type_identifier
       regex: '^serde_json::Value$'
     - kind: use_declaration
       regex: 'serde_json::(\{[^}]*\b)?Value\b'
+ignores:
+  - '**/tests/**'
+  - '**/tests.rs'
