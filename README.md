@@ -147,6 +147,8 @@ never edits your Cargo.toml.
 | panics in fallible code, dead `pub`         | `panic_in_result_fn`, `unwrap_in_result`, `unreachable_pub`          |
 | test assertions that hide the error         | `assertions_on_result_states`                                        |
 | one module layout                           | `mod_module_files`: `foo.rs` next to `foo/`, never `foo/mod.rs`      |
+| panics the preset's bans don't name         | `unreachable`, `exit` (outside `main`), and `no-panic-bypass` below  |
+| test-only branches in shipped code          | `cfg_not_test`, and `no-cfg-test-in-prod` below                      |
 
 Clippy's own `cognitive_complexity` is left off. Clippy's docs say it doesn't measure what it
 claims to, so `cargo bs` counts cyclomatic complexity itself.
@@ -179,6 +181,14 @@ The Effect rules have no Rust counterpart. `no-switch` doesn't port, since `matc
 | `module-doc`           | a file without a `//!` comment saying what it's for (`build.rs` exempt)               |  —  |
 | `no-commented-out-code` | `//` comments that parse as Rust statements                                          |  —  |
 | `newtype-ids`          | an `id`/`*_id`/`*_ids` field or parameter typed `String`, `&str`, an integer or `Uuid` |  —  |
+| `no-silent-err-arm`    | `Err(_) => {}` (or `continue`, `break`, `None`, `()`, `return`, `Default::default()`), and `if let Err(_) = .. {}`, outside tests |  —  |
+| `no-filter-map-ok`     | `.filter_map(Result::ok)`, `.filter_map(\|r\| r.ok())`, `.flatten()` over `read_dir`/`lines()`: every failed item vanishes |  —  |
+| `no-discard-assign`    | `_ = fallible();`, which no rustc or clippy lint sees, and `let _ = name;` (an unused-binding silencer) |  —  |
+| `no-panic-bypass`      | `assert!`, `assert_eq!`, `assert_ne!` in shipped code (not tests, examples, benches or build scripts; `const` assertions and `debug_assert!` pass) |  —  |
+| `no-anyhow-in-lib`     | `anyhow`, `eyre` or `color_eyre` in library code; binaries, build scripts, tests, examples and benches may use them |  —  |
+| `test-conditional-assert` | an assertion in a test that sits under an `if let` with no `else`, or in a `match` next to `_ => {}`: it never runs when the case fails |  —  |
+| `test-early-return`    | a `return` (or `return Ok(())`) inside a branch of a `#[test]`: a skip that reports a pass; use `#[ignore = "why"]` |  —  |
+| `no-cfg-test-in-prod`  | in shipped code, `cfg!(test)`, `#[cfg(test)]` inside a function body, and `*_for_test(s)`/`*_for_testing`/`test_only_*` functions outside `#[cfg(test)]` |  —  |
 
 Test code, which several rules exempt or only check, is a `#[test]` function, a `#[cfg(test)]`
 module (`cfg(all(test, ...))` too), a file in a `tests/` directory directly under a crate's root,

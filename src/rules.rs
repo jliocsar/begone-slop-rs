@@ -11,14 +11,18 @@ mod gap;
 mod hidden_code;
 mod io_boundary;
 mod layers;
+mod library_errors;
 mod lint_waivers;
 mod modules;
 mod names;
 mod padding;
+mod panic_bypass;
 mod paths;
 mod prefer_match;
 mod reexport_only;
 mod signatures;
+mod silent_errors;
+mod test_honesty;
 mod test_hygiene;
 mod test_scope;
 mod unit;
@@ -41,22 +45,30 @@ pub enum Rule {
     ModuleDoc,
     NewtypeIds,
     NoAbbreviations,
+    NoAnyhowInLib,
     NoBlockingInAsync,
     NoBooleanTrap,
     NoCommentedOutCode,
     NoCrateLevelAllow,
+    NoDiscardAssign,
+    NoFilterMapOk,
     NoForbiddenExpects,
     NoHiddenCode,
     NoJunkDrawerModules,
     NoMutableAccumulator,
     NoNumberedNames,
+    NoPanicBypass,
+    NoSilentErrorArm,
     NoSleepInTests,
     NoStringlyFields,
+    NoTestSwitchesInProduction,
     NoTypeInName,
     NoWildcardOnLocalEnum,
     Padding,
     PreferMatch,
     ReexportOnly,
+    TestConditionalAssert,
+    TestEarlyReturn,
     TestMustAssert,
     TestName,
     UseGroups,
@@ -74,22 +86,30 @@ impl Rule {
             Self::ModuleDoc => "module-doc",
             Self::NewtypeIds => "newtype-ids",
             Self::NoAbbreviations => "no-abbreviations",
+            Self::NoAnyhowInLib => "no-anyhow-in-lib",
             Self::NoBlockingInAsync => "no-blocking-in-async",
             Self::NoBooleanTrap => "no-boolean-trap",
             Self::NoCommentedOutCode => "no-commented-out-code",
             Self::NoCrateLevelAllow => "no-crate-level-allow",
+            Self::NoDiscardAssign => "no-discard-assign",
+            Self::NoFilterMapOk => "no-filter-map-ok",
             Self::NoForbiddenExpects => "no-forbidden-expects",
             Self::NoHiddenCode => "no-hidden-code",
             Self::NoJunkDrawerModules => "no-junk-drawer-modules",
             Self::NoMutableAccumulator => "no-mutable-accumulator",
             Self::NoNumberedNames => "no-numbered-names",
+            Self::NoPanicBypass => "no-panic-bypass",
+            Self::NoSilentErrorArm => "no-silent-err-arm",
             Self::NoSleepInTests => "no-sleep-in-tests",
             Self::NoStringlyFields => "no-stringly-fields",
+            Self::NoTestSwitchesInProduction => "no-cfg-test-in-prod",
             Self::NoTypeInName => "no-type-in-name",
             Self::NoWildcardOnLocalEnum => "no-wildcard-on-local-enum",
             Self::Padding => "padding",
             Self::PreferMatch => "prefer-match",
             Self::ReexportOnly => "reexport-only-module",
+            Self::TestConditionalAssert => "test-conditional-assert",
+            Self::TestEarlyReturn => "test-early-return",
             Self::TestMustAssert => "test-must-assert",
             Self::TestName => "test-name",
             Self::UseGroups => "use-groups",
@@ -106,7 +126,7 @@ impl Rule {
 
 impl Rule {
     /// Every rule, in the order of the enum.
-    pub const ALL: [Self; 27] = [
+    pub const ALL: [Self; 35] = [
         Self::AssertPadding,
         Self::Complexity,
         Self::IoBoundary,
@@ -114,22 +134,30 @@ impl Rule {
         Self::ModuleDoc,
         Self::NewtypeIds,
         Self::NoAbbreviations,
+        Self::NoAnyhowInLib,
         Self::NoBlockingInAsync,
         Self::NoBooleanTrap,
         Self::NoCommentedOutCode,
         Self::NoCrateLevelAllow,
+        Self::NoDiscardAssign,
+        Self::NoFilterMapOk,
         Self::NoForbiddenExpects,
         Self::NoHiddenCode,
         Self::NoJunkDrawerModules,
         Self::NoMutableAccumulator,
         Self::NoNumberedNames,
+        Self::NoPanicBypass,
+        Self::NoSilentErrorArm,
         Self::NoSleepInTests,
         Self::NoStringlyFields,
+        Self::NoTestSwitchesInProduction,
         Self::NoTypeInName,
         Self::NoWildcardOnLocalEnum,
         Self::Padding,
         Self::PreferMatch,
         Self::ReexportOnly,
+        Self::TestConditionalAssert,
+        Self::TestEarlyReturn,
         Self::TestMustAssert,
         Self::TestName,
         Self::UseGroups,
@@ -265,6 +293,10 @@ pub fn run(source: &Source, file: &syn::File, context: &Context) -> Vec<Finding>
     findings.extend(async_blocking::check(file));
     findings.extend(hidden_code::check(file, context));
     findings.extend(waivers::check(source));
+    findings.extend(silent_errors::check(file, context));
+    findings.extend(panic_bypass::check(file, context));
+    findings.extend(library_errors::check(file, context));
+    findings.extend(test_honesty::check(file, context));
     findings.retain(|finding| {
         !finding.rule.is_waivable() || !source.waives(finding.line, finding.rule.name())
     });
