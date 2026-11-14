@@ -86,13 +86,19 @@ in, so running it from a member crate checks the same thing. There's no waiver f
   generated-code idiom, `include!(concat!(env!("OUT_DIR"), ...))`, passes.
 - `waiver-needs-reason`: a waiver names what it waives and says why, in a sentence (3 words or
   more). A `bs-allow` only counts in a plain `//` comment, not in a string, a doc comment or a
-  block comment, and naming a gate rule, an unknown rule or a pattern rule is a finding. ast-grep
+  block comment, and naming a gate rule or a pattern rule is a finding. ast-grep
   honours any comment that opens with `ast-grep-ignore`, so the only one that passes is a plain
   `//` comment on its own line, right above the code it waives, naming pattern rules and a
   reason: `// ast-grep-ignore: no-catch-unwind -- the FFI boundary must not unwind`. A bare one
   (it waives every rule), one in a `/* */` or doc comment, one after code on its line, and one
   above a blank line (on line 1, that waives the whole file) all fail. This is a syntax rule, not
   a pattern rule, so ast-grep can't waive it.
+- `unknown-waiver`: a `bs-allow` naming a rule that doesn't exist (`bs-allow(complexty)`) waives
+  nothing, so it's a finding rather than a silent no-op.
+- `unused-waiver`: a `bs-allow` that takes no finding off the report, because the code it
+  excused changed or it sits a line too far from it, is a finding: delete it. Like rustc's
+  `unfulfilled_lint_expectations`, it keeps old waivers from hiding the next finding there. A
+  waiver that's already a `waiver-needs-reason` finding isn't reported again.
 
 None of these rules can be waived.
 
@@ -179,7 +185,7 @@ The Effect rules have no Rust counterpart. `no-switch` doesn't port, since `matc
 | `no-type-in-name`      | `user_vec`, `name_str`, `lookup_hashmap`: the type already says it                    |  —  |
 | `no-junk-drawer-modules` | modules named `utils`, `helpers`, `common`, `misc`                                  |  —  |
 | `module-doc`           | a file without a `//!` comment saying what it's for (`build.rs` exempt)               |  —  |
-| `no-commented-out-code` | `//` comments that parse as Rust statements                                          |  —  |
+| `no-commented-out-code` | a run of `//` comments, each on its own line, that parses as Rust statements (comments are lexed, so text in a string literal is never one) |  —  |
 | `newtype-ids`          | an `id`/`*_id`/`*_ids` field or parameter typed `String`, `&str`, an integer or `Uuid` |  —  |
 | `no-silent-err-arm`    | `Err(_) => {}` (or `continue`, `break`, `None`, `()`, `return`, `Default::default()`), and `if let Err(_) = .. {}`, outside tests |  —  |
 | `no-filter-map-ok`     | `.filter_map(Result::ok)`, `.filter_map(\|r\| r.ok())`, `.flatten()` over `read_dir`/`lines()`: every failed item vanishes |  —  |

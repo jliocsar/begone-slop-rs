@@ -5,12 +5,14 @@ use std::path::{Path, PathBuf};
 
 use super::paths::Imports;
 use super::test_scope::TestLines;
+use super::waivers::{self, Waiver};
 use super::{Context, Role};
 use crate::config::Config;
 use crate::source::Source;
 
 /// One file as the rules see it: its text, its syntax tree, where it sits in the project, and
-/// the facts several rules share (which lines are tests, what each import names).
+/// the facts several rules share (which lines are tests, what each import names, which
+/// `bs-allow` waivers it holds).
 pub struct FileContext<'run> {
     pub(super) source: &'run Source,
     pub(super) syntax: &'run syn::File,
@@ -21,6 +23,7 @@ pub struct FileContext<'run> {
     pub(super) listed: &'run HashSet<PathBuf>,
     pub(super) imports: Imports,
     pub(super) tests: TestLines,
+    pub(super) waivers: Vec<Waiver>,
 }
 
 impl<'run> FileContext<'run> {
@@ -41,6 +44,7 @@ impl<'run> FileContext<'run> {
             listed: context.listed,
             imports: Imports::of(syntax),
             tests: TestLines::of(syntax, context.role),
+            waivers: waivers::parse(source),
         }
     }
 
