@@ -79,6 +79,10 @@ The Effect rules have no Rust counterpart. `no-switch` doesn't port, since `matc
 | `assert-padding`       | in tests, an assertion run not fenced off by blank lines, or one with blanks inside   | ✅  |
 | `complexity`           | a function with cyclomatic complexity over 15                                         |  —  |
 | `reexport-only-module` | a module file that only re-exports (`lib.rs` and `main.rs` are exempt)                |  —  |
+| `use-groups`           | imports not grouped std → other crates → this crate, one blank line between groups    | ✅  |
+| `no-abbreviations`     | a declared name with an abbreviation that needs decoding (`ctx`, `cfg`, `idx`, `msg`…) |  —  |
+| `test-name`            | a test named `test_*`, `*_test`, `test2`, `it_works`, `works`, `basic` or `smoke`     |  —  |
+| `no-sleep-in-tests`    | `sleep` in test code (`thread::sleep`, `tokio::time::sleep`, …)                       |  —  |
 
 `padding` is begone-slop's `padding-line-between-statements` preset, read for Rust:
 
@@ -103,6 +107,15 @@ arm past the first, plus one per guard. `?` doesn't count: it's how Rust says "a
 counting it would punish the code that handles every error. Closures count toward their function,
 and nested `fn`s are measured on their own.
 
+`use-groups` is rustfmt's unstable `group_imports = "StdExternalCrate"`, on stable. A run of
+imports that's out of order is rewritten in place, and rustfmt then sorts inside each group. A run
+with a comment inside is only reported, since the comment could belong to either neighbour.
+
+`no-abbreviations` checks only the names your code declares: bindings, parameters, functions,
+fields, types, variants and constants. Names used from other crates, and methods in a trait impl,
+are left alone. Words the language itself uses, like `str`, `len`, `args` and `fmt`, aren't on the
+list. Neither are domain words like `expr` or `stmt`.
+
 Waive a finding with a comment on its line or the line above. The reason is required:
 
 ```rust
@@ -120,6 +133,10 @@ fn key_name(key: Key) -> &'static str {
 | `no-catch-unwind`      | `catch_unwind` used as try/catch                                  |
 | `no-glob-reexport`     | `pub use module::*`                                               |
 | `no-untyped-json`      | `serde_json::Value`, the `unknown` of Rust                        |
+| `no-stringly-match`    | string-literal match arms outside a parse (`FromStr`, `TryFrom`, `parse*`, `from_*`) |
+| `no-swallowed-parse`   | `.parse().unwrap_or(…)` and friends: bad input becomes a default  |
+| `todo-needs-issue`     | `TODO`/`FIXME`/`XXX`/`HACK` without `(ABC-123)`, `(#12)` or a URL |
+| `ignore-needs-reason`  | a bare `#[ignore]`; write `#[ignore = "why"]`                      |
 
 Waive one with ast-grep's own `// ast-grep-ignore: <rule>` comment, and a reason next to it. The
 rule files live in [`rules/`](rules), with tests in [`rule-tests/`](rule-tests). `sgconfig.yml`

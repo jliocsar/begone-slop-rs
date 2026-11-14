@@ -1,0 +1,11 @@
+id: todo-needs-issue
+language: Rust
+severity: error
+message: A TODO without an issue is a wish nobody tracks. Link one, as `TODO(ABC-123):` or `TODO(#12):`.
+rule:
+  any:
+    - kind: line_comment
+    - kind: block_comment
+  regex: '\b(TODO|FIXME|XXX|HACK)\b'
+  not:
+    regex: '\b(TODO|FIXME|XXX|HACK)\((#\d+|[A-Z][A-Z0-9]*-\d+|https?://[^)\s]+)\)'

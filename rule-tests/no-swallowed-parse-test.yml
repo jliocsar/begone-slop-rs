@@ -1,0 +1,8 @@
+id: no-swallowed-parse
+valid:
+  - 'fn port(text: &str) -> Result<u16, ParseIntError> { text.parse() }'
+  - 'fn port(value: Option<u16>) -> u16 { value.unwrap_or(80) }'
+invalid:
+  - 'fn port(text: &str) -> u16 { text.parse().unwrap_or(80) }'
+  - 'fn port(text: &str) -> u16 { text.parse::<u16>().unwrap_or_default() }'
+  - 'fn port(text: &str) -> u16 { text.trim().parse().unwrap_or_else(|_| 80) }'

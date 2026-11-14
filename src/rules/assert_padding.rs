@@ -3,12 +3,11 @@
 //! The Rust reading of begone-slop's `expect-padding`. The run is the test's verdict, so it
 //! reads as one paragraph, fenced off from the setup above it.
 
-use std::path::Component;
-
 use syn::visit::{self, Visit};
-use syn::{Attribute, Block, File, ItemFn, ItemMod, Meta};
+use syn::{Block, File, ItemFn, ItemMod};
 
 use super::gap::{forbid_blank, require_blank};
+use super::test_scope::{is_test_fn, is_test_module, is_test_path};
 use super::unit::{Kind, Unit};
 use super::{Finding, Rule};
 use crate::source::Source;
@@ -88,28 +87,8 @@ impl<'ast> Visit<'ast> for AssertPadding<'_> {
     }
 }
 
-fn is_test_fn(attributes: &[Attribute]) -> bool {
-    attributes.iter().any(|attribute| {
-        attribute
-            .path()
-            .segments
-            .last()
-            .is_some_and(|segment| segment.ident == "test")
-    })
-}
-
-fn is_test_module(attributes: &[Attribute]) -> bool {
-    attributes.iter().any(|attribute| {
-        attribute.path().is_ident("cfg")
-            && matches!(&attribute.meta, Meta::List(list) if list.tokens.to_string() == "test")
-    })
-}
-
 pub(super) fn check(source: &Source, file: &File) -> Vec<Finding> {
-    let test_file = source
-        .path
-        .components()
-        .any(|component| component == Component::Normal("tests".as_ref()));
+    let test_file = is_test_path(&source.path);
     let mut padding = AssertPadding {
         source,
         findings: Vec::new(),

@@ -1,0 +1,31 @@
+id: no-stringly-match
+language: Rust
+severity: error
+message: Matching on string literals keeps the value a string. Parse it into an enum once, at the boundary.
+note: |
+  The parse is the one place string arms belong, so they're allowed inside a `FromStr` or
+  `TryFrom` impl and in functions named `parse*` or `from_*`. Everything past that matches
+  on the enum, and the compiler checks every case.
+rule:
+  kind: match_expression
+  has:
+    kind: match_block
+    has:
+      kind: match_arm
+      has:
+        field: pattern
+        has:
+          kind: string_literal
+          stopBy: end
+  not:
+    inside:
+      stopBy: end
+      any:
+        - kind: impl_item
+          has:
+            field: trait
+            regex: '(FromStr|TryFrom)'
+        - kind: function_item
+          has:
+            field: name
+            regex: '^(parse|from_)'

@@ -1,0 +1,20 @@
+id: no-swallowed-parse
+language: Rust
+severity: error
+message: A parse that falls back to a default turns bad input into a valid-looking value.
+note: |
+  Return the parse error, or report it before falling back. `"abc".parse().unwrap_or(0)` is
+  a 0 nobody typed.
+rule:
+  kind: call_expression
+  has:
+    field: function
+    kind: field_expression
+    all:
+      - has:
+          field: field
+          regex: '^unwrap_or(_default|_else)?$'
+      - has:
+          field: value
+          kind: call_expression
+          regex: '\.parse(::<[\s\S]*>)?\(\)$'

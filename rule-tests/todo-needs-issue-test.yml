@@ -1,0 +1,8 @@
+id: todo-needs-issue
+valid:
+  - "// TODO(JC-240): move the keymap off JSON\nfn run() {}"
+  - "// TODO(#12): retry on EAGAIN\nfn run() {}"
+  - "// Retries until the server answers.\nfn run() {}"
+invalid:
+  - "// TODO: move the keymap off JSON\nfn run() {}"
+  - "/* FIXME handle EAGAIN */\nfn run() {}"

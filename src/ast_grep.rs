@@ -6,7 +6,11 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// The files in `rules/`, by id. A test keeps this list and the directory equal.
-pub const RULES: [(&str, &str); 6] = [
+pub const RULES: [(&str, &str); 10] = [
+    (
+        "ignore-needs-reason",
+        include_str!("../rules/ignore-needs-reason.yml"),
+    ),
     (
         "no-box-dyn-error",
         include_str!("../rules/no-box-dyn-error.yml"),
@@ -28,8 +32,20 @@ pub const RULES: [(&str, &str); 6] = [
         include_str!("../rules/no-stringified-error.yml"),
     ),
     (
+        "no-stringly-match",
+        include_str!("../rules/no-stringly-match.yml"),
+    ),
+    (
+        "no-swallowed-parse",
+        include_str!("../rules/no-swallowed-parse.yml"),
+    ),
+    (
         "no-untyped-json",
         include_str!("../rules/no-untyped-json.yml"),
+    ),
+    (
+        "todo-needs-issue",
+        include_str!("../rules/todo-needs-issue.yml"),
     ),
 ];
 

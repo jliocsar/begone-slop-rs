@@ -1,11 +1,15 @@
 //! The syntax rules. Each reads a parsed file and returns findings with line numbers.
 
+mod abbreviations;
 mod assert_padding;
 mod complexity;
 mod gap;
 mod padding;
 mod reexport_only;
+mod test_hygiene;
+mod test_scope;
 mod unit;
+mod use_groups;
 
 use crate::source::{Edit, Source};
 
@@ -14,8 +18,12 @@ use crate::source::{Edit, Source};
 pub enum Rule {
     AssertPadding,
     Complexity,
+    NoAbbreviations,
+    NoSleepInTests,
     Padding,
     ReexportOnly,
+    TestName,
+    UseGroups,
 }
 
 impl Rule {
@@ -24,8 +32,12 @@ impl Rule {
         match self {
             Self::AssertPadding => "assert-padding",
             Self::Complexity => "complexity",
+            Self::NoAbbreviations => "no-abbreviations",
+            Self::NoSleepInTests => "no-sleep-in-tests",
             Self::Padding => "padding",
             Self::ReexportOnly => "reexport-only-module",
+            Self::TestName => "test-name",
+            Self::UseGroups => "use-groups",
         }
     }
 }
@@ -46,6 +58,9 @@ pub fn run(source: &Source, file: &syn::File) -> Vec<Finding> {
     findings.extend(assert_padding::check(source, file));
     findings.extend(complexity::check(file));
     findings.extend(reexport_only::check(source, file));
+    findings.extend(abbreviations::check(file));
+    findings.extend(test_hygiene::check(source, file));
+    findings.extend(use_groups::check(source, file));
     findings.retain(|finding| !source.waives(finding.line, finding.rule.name()));
     findings.sort_by_key(|finding| finding.line);
 

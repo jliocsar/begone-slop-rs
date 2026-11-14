@@ -1,6 +1,6 @@
 //! A source file as lines, which is what the padding rules read and their fixes rewrite.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 /// A line-based change one finding asks for. Lines are 1-based, as spans and editors count.
@@ -8,6 +8,12 @@ use std::path::PathBuf;
 pub enum Edit {
     InsertBlankAfter(usize),
     DeleteLines(Vec<usize>),
+    /// Lines `first..=last` become `lines`.
+    Replace {
+        first: usize,
+        last: usize,
+        lines: Vec<String>,
+    },
 }
 
 /// A Rust source file, split into lines.
@@ -73,6 +79,7 @@ impl Source {
     pub fn apply(&mut self, edits: &[Edit]) {
         let mut inserts: BTreeSet<usize> = BTreeSet::new();
         let mut deletes: BTreeSet<usize> = BTreeSet::new();
+        let mut replacements: BTreeMap<usize, &[String]> = BTreeMap::new();
 
         for edit in edits {
             match edit {
@@ -80,6 +87,10 @@ impl Source {
                     inserts.insert(*number);
                 }
                 Edit::DeleteLines(numbers) => deletes.extend(numbers.iter().copied()),
+                Edit::Replace { first, last, lines } => {
+                    deletes.extend(*first..=*last);
+                    replacements.insert(*first, lines);
+                }
             }
         }
 
@@ -87,10 +98,11 @@ impl Source {
             .into_iter()
             .zip(1..)
             .flat_map(|(text, number)| {
+                let replaced = replacements.get(&number).copied().unwrap_or_default();
                 let kept = (!deletes.contains(&number)).then_some(text);
                 let blank = inserts.contains(&number).then(String::new);
 
-                kept.into_iter().chain(blank)
+                replaced.iter().cloned().chain(kept).chain(blank)
             })
             .collect();
     }
