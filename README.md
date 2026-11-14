@@ -46,9 +46,27 @@ it finds, so the two never fight.
 
 The quickest way past a lint gate is to weaken the gate, so `cargo bs` checks that too.
 
-- `preset-drift`: every preset lint stays at its preset level or stricter, every crate inherits
-  the workspace lints (`[lints] workspace = true`), and every `clippy.toml` keeps the preset's
-  settings. A project may add lints and settings; it may not loosen these. There's no waiver.
+- `preset-drift`: every lint the preset turns on ends up at the preset's level or stricter, read
+  the way Cargo and rustc resolve the table: a group sets every lint in it, and the entry with
+  the highest `priority` wins. So `too_many_lines = "allow"` (a pedantic lint) and
+  `restriction = { level = "allow", priority = 1 }` both fail, and `unwrap_used = "deny"`
+  passes. Where two entries tie, the looser one counts. `warnings = "allow"` and an allow of a
+  lint `cargo bs` doesn't know fail too. Every workspace member inherits the workspace lints
+  (`[lints] workspace = true`). Every `clippy.toml` (the one clippy finds at or above the root,
+  and any below it) may only tighten: thresholds move the strict way, exemption lists
+  (`allowed-*`) shrink, ban lists (`disallowed-*`) grow, `allow-*` switches turn off. A key it
+  doesn't set counts as clippy's default, so `too-many-lines-threshold = 1000` fails even though
+  the preset never writes it down; `msrv` and unknown keys fail. A manifest or config that can't
+  be read or parsed is a finding.
+- `cargo-config-drift`: `.cargo/config.toml` and `.cargo/config`, in the root and every directory
+  above it (Cargo reads them all), may not turn lints down: no `-A`/`--allow`/`--cap-lints` in
+  `rustflags` (it beats the lints table), no `-W` on a lint the preset denies, no `[env]`
+  `CLIPPY_CONF_DIR`/`RUSTFLAGS`/`RUSTC_WRAPPER`…, no `build.rustc-wrapper`, and no alias named
+  `clippy`, `fmt` or `bs`, except the in-tree `bs = "run --bin cargo-bs -- bs"` bootstrap. The
+  same flags or `CLIPPY_CONF_DIR` in `cargo bs`'s own environment fail the run.
+
+Both are checked from the project's root: the workspace that includes the crate `cargo bs` runs
+in, so running it from a member crate checks the same thing. There's no waiver for either.
 - `no-forbidden-expects`: outside tests, the lints that guard the gate can't be waived at all, not
   even with a reason: `unwrap_used`, `expect_used`, `panic`, `todo`, `dead_code`, `unused*`,
   `unsafe_code`, `allow_attributes`, `clippy::all`, `clippy::pedantic`, `warnings` and a few more.
@@ -215,4 +233,8 @@ test fails if `Cargo.toml` drifts from `preset/lints.toml`, and another runs the
 ```sh
 git config core.hooksPath .githooks   # the gate on every commit
 scripts/check                         # fmt, clippy, tests, cargo bs, ast-grep tests
+scripts/lint-table                    # after a toolchain bump: refresh the known lints and groups
 ```
+
+`preset-drift` resolves groups with `src/lints/known.rs`, which `scripts/lint-table` generates
+from `clippy-driver -W help`.

@@ -1,12 +1,12 @@
 //! `cargo bs`: begone-slop for Rust.
 
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use cargo_bs::check::{self, CheckError, Mode};
 use cargo_bs::config::Config;
-use cargo_bs::{ast_grep, drift, files, init};
+use cargo_bs::{ast_grep, drift, files, init, preset};
 
 const USAGE: &str = "\
 usage: cargo bs [--fix] [--no-ast-grep] [PATH...]
@@ -44,10 +44,11 @@ impl fmt::Display for UnknownFlag {
 
 fn main() -> ExitCode {
     // Cargo runs `cargo-bs bs <args>`; run directly, there's no `bs`.
-    let arguments: Vec<String> = std::env::args()
-        .skip(1)
-        .skip_while(|argument| argument == "bs")
-        .collect();
+    let mut arguments: Vec<String> = std::env::args().skip(1).collect();
+
+    if arguments.first().is_some_and(|first| first == "bs") {
+        arguments.remove(0);
+    }
 
     match parse(arguments) {
         Ok(Command::Help) => {
@@ -105,7 +106,7 @@ fn run_init() -> ExitCode {
 
             println!(
                 "\nAdd these to the root Cargo.toml, and `[lints] workspace = true` to each crate:\n\n{}",
-                init::LINTS
+                preset::LINTS
             );
 
             ExitCode::SUCCESS
@@ -119,9 +120,16 @@ fn run_init() -> ExitCode {
 }
 
 fn run_check(options: &Options) -> ExitCode {
-    let root = Path::new(".");
+    let root = match std::env::current_dir() {
+        Ok(directory) => files::project_root(&directory),
+        Err(error) => {
+            eprintln!("cargo bs: can't read the current directory: {error}");
 
-    let config = match Config::load(root) {
+            return ExitCode::from(2);
+        }
+    };
+
+    let config = match Config::load(&root) {
         Ok(config) => config,
         Err(error) => {
             eprintln!("cargo bs: {error}");
@@ -139,15 +147,10 @@ fn run_check(options: &Options) -> ExitCode {
         }
     };
 
-    let drifts = drift::check(root);
+    let drifts = drift::check(&root);
 
     for found in &drifts {
-        println!(
-            "{}:{}: preset-drift: {}",
-            found.path.display(),
-            found.line,
-            found.message
-        );
+        println!("{found}");
     }
 
     let mut problems = drifts.len();

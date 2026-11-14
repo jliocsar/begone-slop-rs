@@ -9,5 +9,7 @@ pub mod config;
 pub mod drift;
 pub mod files;
 pub mod init;
+pub mod lints;
+pub mod preset;
 pub mod rules;
 pub mod source;

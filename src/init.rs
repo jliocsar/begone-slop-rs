@@ -8,14 +8,7 @@ use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::path::Path;
 
-/// The `[workspace.lints]` tables, as `preset/lints.toml` holds them.
-pub const LINTS: &str = include_str!("../preset/lints.toml");
-
-/// The preset `clippy.toml`, which is this repo's own.
-pub const CLIPPY: &str = include_str!("../clippy.toml");
-
-/// The preset `rustfmt.toml`, which is this repo's own.
-pub const RUSTFMT: &str = include_str!("../rustfmt.toml");
+use crate::preset::{CLIPPY, RUSTFMT};
 
 const PRESET_FILES: [(&str, &str); 2] = [("clippy.toml", CLIPPY), ("rustfmt.toml", RUSTFMT)];
 
@@ -50,23 +43,4 @@ pub fn write_presets(root: &Path) -> io::Result<Vec<Outcome>> {
             }
         })
         .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fs;
-    use std::path::Path;
-
-    use super::LINTS;
-
-    #[test]
-    fn this_repo_uses_the_lints_it_hands_out() {
-        let manifest =
-            fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")).unwrap();
-
-        assert!(
-            manifest.contains(LINTS),
-            "Cargo.toml's lints drifted from preset/lints.toml"
-        );
-    }
 }
