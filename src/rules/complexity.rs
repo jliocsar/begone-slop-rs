@@ -115,14 +115,29 @@ impl<'ast> Visit<'ast> for Branches {
     }
 }
 
-/// A literal, a path, or a constructor call on values: an arm that looks something up.
+/// A literal, a path, or a constructor call on values: an arm that looks something up. A call
+/// to a function (`handle_open(arg)`) is a decision dressed as a value, so it isn't one.
 fn is_value(expr: &Expr) -> bool {
     match expr {
         Expr::Lit(_) | Expr::Path(_) => true,
         Expr::Reference(reference) => is_value(&reference.expr),
-        Expr::Call(call) => matches!(&*call.func, Expr::Path(_)) && call.args.iter().all(is_value),
+        Expr::Call(call) => is_constructor(&call.func) && call.args.iter().all(is_value),
         _ => false,
     }
+}
+
+/// `Some`, `Kind::Open`, `Wrapper`: a variant or tuple struct, named in uppercase.
+fn is_constructor(callee: &Expr) -> bool {
+    let Expr::Path(path) = callee else {
+        return false;
+    };
+
+    path.path.segments.last().is_some_and(|segment| {
+        segment
+            .ident
+            .to_string()
+            .starts_with(|first: char| first.is_uppercase())
+    })
 }
 
 pub(super) fn check(file: &File) -> Vec<Finding> {
@@ -176,6 +191,30 @@ mod tests {
             .concat();
         let text = format!(
             "fn name(value: u8) -> &'static str {{\n    match value {{\n{arms}        _ => \"other\",\n    }}\n}}\n"
+        );
+
+        assert_eq!(lines_of(Rule::Complexity, &text), NONE);
+    }
+
+    #[test]
+    fn a_dispatch_to_functions_counts_every_arm() {
+        let arms = (0..16)
+            .map(|number| format!("        Command::Op{number}(arg) => handle_op{number}(arg),\n"))
+            .collect::<Vec<_>>()
+            .concat();
+        let text = format!("fn run(command: Command) {{\n    match command {{\n{arms}    }}\n}}\n");
+
+        assert_eq!(lines_of(Rule::Complexity, &text), [1]);
+    }
+
+    #[test]
+    fn a_match_that_wraps_values_in_variants_counts_once() {
+        let arms = (0..30)
+            .map(|number| format!("        {number} => Some(Kind::Op{number}(CODE)),\n"))
+            .collect::<Vec<_>>()
+            .concat();
+        let text = format!(
+            "fn kind(value: u8) -> Option<Kind> {{\n    match value {{\n{arms}        _ => None,\n    }}\n}}\n"
         );
 
         assert_eq!(lines_of(Rule::Complexity, &text), NONE);

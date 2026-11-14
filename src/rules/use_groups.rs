@@ -5,7 +5,7 @@
 //! sorts inside each group, since it sorts any run of imports without a blank line.
 
 use syn::visit::{self, Visit};
-use syn::{File, Item, ItemMod, ItemUse, UseTree};
+use syn::{File, Item, ItemMod, ItemUse, UseTree, Visibility};
 
 use super::gap::{Gap, forbid_blank, require_blank};
 use super::{Finding, Rule};
@@ -26,6 +26,8 @@ struct Import {
     start: usize,
     end: usize,
     group: Group,
+    /// A `pub use`: re-exports may sit apart from the imports in their group.
+    exported: bool,
 }
 
 struct UseGroups<'source> {
@@ -34,26 +36,37 @@ struct UseGroups<'source> {
 }
 
 impl Import {
-    fn of(import: &ItemUse) -> Self {
+    /// `locals` are the modules and enums declared next to the import: `use child::Thing`
+    /// names this crate's code, just as `use self::child::Thing` would.
+    fn of(import: &ItemUse, locals: &[String]) -> Self {
         let span = syn::spanned::Spanned::span(import);
 
         let root = match &import.tree {
-            UseTree::Path(path) if import.leading_colon.is_none() => Some(&path.ident),
-            UseTree::Name(name) if import.leading_colon.is_none() => Some(&name.ident),
-            UseTree::Rename(rename) if import.leading_colon.is_none() => Some(&rename.ident),
-            _ => None,
+            UseTree::Path(path) => Some(&path.ident),
+            UseTree::Name(name) => Some(&name.ident),
+            UseTree::Rename(rename) => Some(&rename.ident),
+            UseTree::Glob(_) | UseTree::Group(_) => None,
         };
 
-        let group = match root.map(ToString::to_string) {
-            Some(name) if STD_CRATES.contains(&name.as_str()) => Group::Std,
-            Some(name) if LOCAL_ROOTS.contains(&name.as_str()) => Group::Local,
-            _ => Group::External,
+        let root = root.map(ToString::to_string);
+        let absolute = import.leading_colon.is_some();
+
+        let group = match root.as_deref() {
+            Some(name) if STD_CRATES.contains(&name) => Group::Std,
+            Some(_) if absolute => Group::External,
+            Some(name)
+                if LOCAL_ROOTS.contains(&name) || locals.iter().any(|local| local == name) =>
+            {
+                Group::Local
+            }
+            Some(_) | None => Group::External,
         };
 
         Self {
             start: span.start().line,
             end: span.end().line,
             group,
+            exported: !matches!(import.vis, Visibility::Inherited),
         }
     }
 
@@ -67,11 +80,19 @@ impl Import {
 
 impl UseGroups<'_> {
     fn items(&mut self, items: &[Item]) {
+        let locals: Vec<String> = items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Mod(module) => Some(module.ident.to_string()),
+                Item::Enum(declared) => Some(declared.ident.to_string()),
+                _ => None,
+            })
+            .collect();
         let mut run: Vec<Import> = Vec::new();
 
         for item in items {
             if let Item::Use(import) = item {
-                run.push(Import::of(import));
+                run.push(Import::of(import, &locals));
             } else {
                 self.run(&std::mem::take(&mut run));
             }
@@ -96,10 +117,12 @@ impl UseGroups<'_> {
 
             let gap = previous.gap_to(*next);
 
-            let finding = if previous.group == next.group {
+            let finding = if previous.group != next.group {
+                require_blank(self.source, gap, Rule::UseGroups, "between import groups")
+            } else if previous.exported == next.exported {
                 forbid_blank(self.source, gap, Rule::UseGroups, "inside an import group")
             } else {
-                require_blank(self.source, gap, Rule::UseGroups, "between import groups")
+                None
             };
 
             self.findings.extend(finding);
@@ -209,6 +232,29 @@ mod tests {
             fixed(text),
             "use std::fs;\n\nuse syn::{\n    File,\n    Item,\n};\n\nuse crate::source::Source;\n\nfn run() {}\n"
         );
+    }
+
+    #[test]
+    fn a_child_module_is_this_crate() {
+        let text =
+            "mod hooks;\n\nuse rune::Key;\n\npub use hooks::run;\n\nuse crate::pane::CellSize;\n";
+
+        assert_eq!(lines_of(Rule::UseGroups, text), NONE);
+    }
+
+    #[test]
+    fn re_exports_may_sit_apart_in_their_group() {
+        let text =
+            "use crate::pane::CellSize;\n\npub use crate::pane::Grids;\nuse crate::term::Size;\n";
+
+        assert_eq!(lines_of(Rule::UseGroups, text), NONE);
+    }
+
+    #[test]
+    fn an_absolute_path_is_another_crate_unless_its_std() {
+        let text = "use ::std::fs;\n\nuse ::serde::Serialize;\nuse syn::File;\n";
+
+        assert_eq!(lines_of(Rule::UseGroups, text), NONE);
     }
 
     #[test]

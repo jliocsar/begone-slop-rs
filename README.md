@@ -204,12 +204,16 @@ and `tests/`. It covers `assert!`, `assert_eq!`, `assert_ne!`, `assert_matches!`
 
 `complexity` starts at 1 and adds one for each `if`, loop, `&&`, `||`, `let ... else`, and match
 arm past the first, plus one per guard. A lookup `match`, where every arm is a plain value (a
-literal, a path, a constructor of values) and none has a guard, counts once: it's a table, not a
-decision tree. `?` doesn't count: it's how Rust says "and then", and
+literal, a path, or an uppercase constructor like `Some(Kind::Open)` applied to values) and none
+has a guard, counts once: it's a table, not a decision tree. An arm that calls a function
+(`Op::Open(arg) => open(arg)`) is a dispatch, so every arm counts. `?` doesn't count: it's how Rust says "and then", and
 counting it would punish the code that handles every error. Closures count toward their function,
 and nested `fn`s are measured on their own.
 
-`use-groups` is rustfmt's unstable `group_imports = "StdExternalCrate"`, on stable. A run of
+`use-groups` is rustfmt's unstable `group_imports = "StdExternalCrate"`, on stable. "This crate"
+is `crate`, `self`, `super`, and a module or enum declared in the same file (`mod hooks;` makes
+`pub use hooks::run;` local); `::std` is std. A blank line may set a group's `pub use` re-exports
+apart from its imports. A run of
 imports that's out of order is rewritten in place, and rustfmt then sorts inside each group. A run
 with a comment inside is only reported, since the comment could belong to either neighbour.
 
