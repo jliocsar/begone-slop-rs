@@ -8,7 +8,7 @@ use syn::visit::{self, Visit};
 use syn::{File, Item, ItemMod, ItemUse, UseTree, Visibility};
 
 use super::gap::{Gap, forbid_blank, require_blank};
-use super::{Finding, Rule};
+use super::{FileContext, Finding, Rule};
 use crate::source::{Edit, Source};
 
 const STD_CRATES: [&str; 5] = ["alloc", "core", "proc_macro", "std", "test"];
@@ -188,12 +188,12 @@ impl<'ast> Visit<'ast> for UseGroups<'_> {
     }
 }
 
-pub(super) fn check(source: &Source, file: &File) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut groups = UseGroups {
-        source,
+        source: file.source,
         findings: Vec::new(),
     };
-    groups.visit_file(file);
+    groups.visit_file(file.syntax);
 
     groups.findings
 }

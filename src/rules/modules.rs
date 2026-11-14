@@ -6,32 +6,33 @@
 
 use std::path::Component;
 
-use syn::{AttrStyle, File};
+use syn::AttrStyle;
 
-use super::{Finding, Rule};
-use crate::source::Source;
+use super::{FileContext, Finding, Rule};
 
 const JUNK_DRAWERS: [&str; 7] = [
     "common", "helper", "helpers", "misc", "stuff", "util", "utils",
 ];
 
-pub(super) fn check(source: &Source, file: &File) -> Vec<Finding> {
-    let drawer =
-        source
-            .path
-            .with_extension("")
-            .components()
-            .find_map(|component| match component {
-                Component::Normal(part) => part
-                    .to_str()
-                    .filter(|part| JUNK_DRAWERS.contains(part))
-                    .map(str::to_owned),
-                _ => None,
-            });
-    let documented = file.attrs.iter().any(|attribute| {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
+    let syntax = file.syntax;
+    let drawer = file
+        .source
+        .path
+        .with_extension("")
+        .components()
+        .find_map(|component| match component {
+            Component::Normal(part) => part
+                .to_str()
+                .filter(|part| JUNK_DRAWERS.contains(part))
+                .map(str::to_owned),
+            _ => None,
+        });
+    let documented = syntax.attrs.iter().any(|attribute| {
         matches!(attribute.style, AttrStyle::Inner(_)) && attribute.path().is_ident("doc")
     });
-    let build_script = source
+    let build_script = file
+        .source
         .path
         .file_name()
         .is_some_and(|name| name == "build.rs");

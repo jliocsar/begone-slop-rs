@@ -10,7 +10,7 @@
 use syn::visit::{self, Visit};
 use syn::{BinOp, Block, Expr, ExprForLoop, Local, Pat, Stmt};
 
-use super::{Finding, Rule};
+use super::{FileContext, Finding, Rule};
 
 const EMPTY_CONSTRUCTORS: [&str; 8] = [
     "BTreeMap", "BTreeSet", "HashMap", "HashSet", "String", "Vec", "VecDeque", "IndexMap",
@@ -148,11 +148,11 @@ fn is_plain(expr: &Expr) -> bool {
     !jumps.0
 }
 
-pub(super) fn check(file: &syn::File) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut accumulators = Accumulators {
         findings: Vec::new(),
     };
-    accumulators.visit_file(file);
+    accumulators.visit_file(file.syntax);
 
     accumulators.findings
 }

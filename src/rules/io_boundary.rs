@@ -5,20 +5,13 @@
 //! effect is spotted where it's imported, or where a full path names it in code. Test code
 //! is exempt: a test may build its own fixtures on disk.
 
-use std::collections::HashMap;
-use std::path::Path;
-
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{File, ItemFn, ItemMod, ItemUse, Macro};
+use syn::{ItemUse, Macro};
 
-use super::paths::{
-    UseLeaf, file_imports, is_pure, macro_arguments, segments, starts_with, use_leaves,
-};
-use super::test_scope::{is_test_fn, is_test_module};
-use super::{Context, Finding, Rule};
-use crate::config::{Config, IoBoundary};
-use crate::source::Source;
+use super::paths::{UseLeaf, is_pure, macro_arguments, segments, starts_with, use_leaves};
+use super::{FileContext, Finding, Rule};
+use crate::config::IoBoundary;
 
 const EFFECTS: [(&str, &str); 28] = [
     ("chrono::Local::now", "the clock"),
@@ -53,19 +46,13 @@ const EFFECTS: [(&str, &str); 28] = [
 
 const PRINT_MACROS: [&str; 5] = ["dbg", "eprint", "eprintln", "print", "println"];
 
-struct IoCheck<'config> {
-    boundary: &'config IoBoundary,
-    imports: HashMap<String, Vec<String>>,
+struct IoCheck<'run> {
+    file: &'run FileContext<'run>,
+    boundary: &'run IoBoundary,
     findings: Vec<Finding>,
-    test_file: bool,
-    test_depth: usize,
 }
 
 impl IoCheck<'_> {
-    fn in_tests(&self) -> bool {
-        self.test_file || self.test_depth > 0
-    }
-
     fn effect_of(&self, full: &[String]) -> Option<String> {
         if is_pure(full) {
             return None;
@@ -86,7 +73,7 @@ impl IoCheck<'_> {
     }
 
     fn report(&mut self, line: usize, what: &str, effect: &str) {
-        if self.in_tests() {
+        if self.file.is_test(line) {
             return;
         }
 
@@ -108,20 +95,6 @@ impl IoCheck<'_> {
 }
 
 impl<'ast> Visit<'ast> for IoCheck<'_> {
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        let is_test = is_test_fn(&function.attrs);
-        self.test_depth += usize::from(is_test);
-        visit::visit_item_fn(self, function);
-        self.test_depth -= usize::from(is_test);
-    }
-
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let is_test = is_test_module(&module.attrs);
-        self.test_depth += usize::from(is_test);
-        visit::visit_item_mod(self, module);
-        self.test_depth -= usize::from(is_test);
-    }
-
     fn visit_item_use(&mut self, import: &'ast ItemUse) {
         for leaf in use_leaves(&import.tree) {
             self.check_leaf(&leaf);
@@ -156,7 +129,7 @@ impl<'ast> Visit<'ast> for IoCheck<'_> {
 
         // An import that is an effect was reported at the `use`; only a path that reaches
         // further through a harmless import (`io::stdout()` after `use std::io`) is new here.
-        let full = match self.imports.get(&first) {
+        let full = match self.file.imports.get(&first) {
             Some(imported) if self.effect_of(imported).is_some() => None,
             Some(imported) => Some(
                 imported
@@ -178,8 +151,8 @@ impl<'ast> Visit<'ast> for IoCheck<'_> {
     }
 }
 
-fn is_allowed(config: &Config, boundary: &IoBoundary, path: &Path) -> bool {
-    config.relative(path).is_some_and(|relative| {
+fn is_allowed(file: &FileContext, boundary: &IoBoundary) -> bool {
+    file.relative.is_some_and(|relative| {
         boundary
             .allowed
             .iter()
@@ -187,25 +160,21 @@ fn is_allowed(config: &Config, boundary: &IoBoundary, path: &Path) -> bool {
     })
 }
 
-pub(super) fn check(source: &Source, file: &File, context: &Context) -> Vec<Finding> {
-    let config = context.config;
-
-    let Some(boundary) = &config.io else {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
+    let Some(boundary) = &file.config.io else {
         return Vec::new();
     };
 
-    if is_allowed(config, boundary, &source.path) {
+    if is_allowed(file, boundary) {
         return Vec::new();
     }
 
     let mut io_check = IoCheck {
+        file,
         boundary,
-        imports: file_imports(file),
         findings: Vec::new(),
-        test_file: context.in_tests(),
-        test_depth: 0,
     };
-    io_check.visit_file(file);
+    io_check.visit_file(file.syntax);
     io_check.findings.dedup_by_key(|finding| finding.line);
 
     io_check.findings
@@ -219,10 +188,14 @@ mod tests {
     use super::check;
     use crate::config::{Config, IoBoundary};
     use crate::rules::testing::NONE;
-    use crate::rules::{Context, Role};
+    use crate::rules::{Context, FileContext, Role};
     use crate::source::Source;
 
     fn io_lines(text: &str) -> Vec<usize> {
+        io_lines_in("src/core.rs", text)
+    }
+
+    fn io_lines_in(path: &str, text: &str) -> Vec<usize> {
         let config = Config {
             io: Some(IoBoundary {
                 allowed: vec![PathBuf::from("src/shell.rs")],
@@ -230,17 +203,18 @@ mod tests {
             }),
             ..Config::default()
         };
-        let source = Source::new("src/core.rs".into(), text);
+        let source = Source::new(path.into(), text);
         let file = syn::parse_file(text).unwrap();
         let listed = HashSet::new();
         let context = Context {
             config: &config,
             role: Role::Library,
-            absolute: PathBuf::from("/project/src/core.rs"),
+            absolute: PathBuf::from("/project").join(path),
+            relative: Some(PathBuf::from(path)),
             listed: &listed,
         };
 
-        check(&source, &file, &context)
+        check(&FileContext::new(&source, &file, &context))
             .iter()
             .map(|finding| finding.line)
             .collect()
@@ -294,5 +268,13 @@ mod tests {
         let text = "#[cfg(test)]\nmod tests {\n    use std::fs;\n}\n";
 
         assert_eq!(io_lines(text), NONE);
+    }
+
+    #[test]
+    fn the_shell_may_touch_the_world() {
+        let text = "use std::fs;\n";
+
+        assert_eq!(io_lines_in("src/shell.rs", text), NONE);
+        assert_eq!(io_lines_in("src/core.rs", text), [1]);
     }
 }

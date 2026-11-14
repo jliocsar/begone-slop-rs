@@ -9,11 +9,11 @@
 use proc_macro2::Ident;
 use syn::visit::{self, Visit};
 use syn::{
-    Field, File, ImplItemFn, ItemConst, ItemEnum, ItemFn, ItemImpl, ItemStatic, ItemStruct,
-    ItemTrait, ItemType, PatIdent, TraitItemFn, Variant,
+    Field, ImplItemFn, ItemConst, ItemEnum, ItemFn, ItemImpl, ItemStatic, ItemStruct, ItemTrait,
+    ItemType, PatIdent, TraitItemFn, Variant,
 };
 
-use super::{Finding, Rule};
+use super::{FileContext, Finding, Rule};
 
 const ABBREVIATIONS: [(&str, &str); 27] = [
     ("attr", "attribute"),
@@ -172,12 +172,12 @@ pub(super) fn words(name: &str) -> Vec<String> {
     found
 }
 
-pub(super) fn check(file: &File) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut abbreviations = Abbreviations {
         findings: Vec::new(),
         in_trait_impl: false,
     };
-    abbreviations.visit_file(file);
+    abbreviations.visit_file(file.syntax);
 
     abbreviations.findings
 }

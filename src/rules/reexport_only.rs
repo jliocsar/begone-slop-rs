@@ -3,30 +3,34 @@
 //! It adds a node to the import graph that owns nothing. Import from where the items live.
 //! `lib.rs` and `main.rs` are exempt: a crate root's re-exports are its public API.
 
-use syn::{File, Item, Visibility};
+use syn::{Item, Visibility};
 
-use super::{Finding, Rule};
-use crate::source::Source;
+use super::{FileContext, Finding, Rule};
 
 const CRATE_ROOTS: [&str; 2] = ["lib.rs", "main.rs"];
 
-pub(super) fn check(source: &Source, file: &File) -> Option<Finding> {
-    let is_root = source
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
+    let syntax = file.syntax;
+    let is_root = file
+        .source
         .path
         .file_name()
         .is_some_and(|name| CRATE_ROOTS.iter().any(|root| name == *root));
     let only_uses =
-        !file.items.is_empty() && file.items.iter().all(|item| matches!(item, Item::Use(_)));
-    let reexports = file.items.iter().any(
+        !syntax.items.is_empty() && syntax.items.iter().all(|item| matches!(item, Item::Use(_)));
+    let reexports = syntax.items.iter().any(
         |item| matches!(item, Item::Use(import) if !matches!(import.vis, Visibility::Inherited)),
     );
 
-    (!is_root && only_uses && reexports).then(|| Finding {
-        line: 1,
-        rule: Rule::ReexportOnly,
-        message: "this module only re-exports; import from where the items live".to_owned(),
-        edit: None,
-    })
+    (!is_root && only_uses && reexports)
+        .then(|| Finding {
+            line: 1,
+            rule: Rule::ReexportOnly,
+            message: "this module only re-exports; import from where the items live".to_owned(),
+            edit: None,
+        })
+        .into_iter()
+        .collect()
 }
 
 #[cfg(test)]

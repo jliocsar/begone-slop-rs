@@ -20,7 +20,7 @@ use syn::{
 };
 
 use super::test_scope::{is_test_fn, is_test_module};
-use super::{Context, Finding, Role, Rule};
+use super::{FileContext, Finding, Role, Rule};
 use crate::module_paths::is_test_only;
 
 const ASSERTING_PREFIXES: [&str; 3] = ["assert", "debug_assert", "prop_assert"];
@@ -287,19 +287,19 @@ fn is_unit_ok(value: &Expr) -> bool {
             && call.args.first().is_some_and(|argument| matches!(argument, Expr::Tuple(unit) if unit.elems.is_empty())))
 }
 
-pub(super) fn check(file: &syn::File, context: &Context) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut tests = Tests {
         findings: Vec::new(),
     };
-    tests.visit_file(file);
+    tests.visit_file(file.syntax);
     let mut findings = tests.findings;
 
-    if matches!(context.role, Role::Library | Role::Binary) {
+    if matches!(file.role, Role::Library | Role::Binary) {
         let mut production = Production {
             findings: Vec::new(),
             fn_depth: 0,
         };
-        production.visit_file(file);
+        production.visit_file(file.syntax);
         findings.extend(production.findings);
     }
 

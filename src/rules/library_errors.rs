@@ -4,31 +4,27 @@
 //! for a binary that only prints it and wrong for a library whose callers have to decide what
 //! a failure means. Binaries, build scripts, tests, examples and benches may use them.
 
-use std::collections::HashMap;
-
+use syn::ItemUse;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{ItemFn, ItemMod, ItemUse};
 
-use super::paths::{file_imports, segments, use_leaves};
-use super::test_scope::{is_test_fn, is_test_module};
-use super::{Context, Finding, Role, Rule};
+use super::paths::{segments, use_leaves};
+use super::{FileContext, Finding, Role, Rule};
 
 const OPAQUE_ERROR_CRATES: [&str; 3] = ["anyhow", "color_eyre", "eyre"];
 
-struct LibraryErrors {
-    imports: HashMap<String, Vec<String>>,
+struct LibraryErrors<'run> {
+    file: &'run FileContext<'run>,
     findings: Vec<Finding>,
-    test_depth: usize,
 }
 
-impl LibraryErrors {
+impl LibraryErrors<'_> {
     fn report(&mut self, line: usize, full: &[String]) {
         let Some(root) = full.first() else {
             return;
         };
 
-        if self.test_depth > 0 || !OPAQUE_ERROR_CRATES.contains(&root.as_str()) {
+        if self.file.is_test(line) || !OPAQUE_ERROR_CRATES.contains(&root.as_str()) {
             return;
         }
 
@@ -41,21 +37,7 @@ impl LibraryErrors {
     }
 }
 
-impl<'ast> Visit<'ast> for LibraryErrors {
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        let is_test = is_test_fn(&function.attrs);
-        self.test_depth += usize::from(is_test);
-        visit::visit_item_fn(self, function);
-        self.test_depth -= usize::from(is_test);
-    }
-
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let is_test = is_test_module(&module.attrs);
-        self.test_depth += usize::from(is_test);
-        visit::visit_item_mod(self, module);
-        self.test_depth -= usize::from(is_test);
-    }
-
+impl<'ast> Visit<'ast> for LibraryErrors<'_> {
     fn visit_item_use(&mut self, import: &'ast ItemUse) {
         for leaf in use_leaves(&import.tree) {
             self.report(leaf.line, &leaf.full);
@@ -67,7 +49,7 @@ impl<'ast> Visit<'ast> for LibraryErrors {
         // A name brought in by a `use` was reported there.
         let imported = written
             .first()
-            .is_some_and(|first| self.imports.contains_key(first));
+            .is_some_and(|first| self.file.imports.contains(first));
 
         if path.leading_colon.is_some() || !imported {
             self.report(path.span().start().line, &written);
@@ -77,17 +59,16 @@ impl<'ast> Visit<'ast> for LibraryErrors {
     }
 }
 
-pub(super) fn check(file: &syn::File, context: &Context) -> Vec<Finding> {
-    if context.role != Role::Library {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
+    if file.role != Role::Library {
         return Vec::new();
     }
 
     let mut errors = LibraryErrors {
-        imports: file_imports(file),
+        file,
         findings: Vec::new(),
-        test_depth: 0,
     };
-    errors.visit_file(file);
+    errors.visit_file(file.syntax);
     errors.findings.dedup_by_key(|finding| finding.line);
 
     errors.findings

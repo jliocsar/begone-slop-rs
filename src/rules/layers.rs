@@ -9,21 +9,20 @@ use std::path::{Component, Path};
 
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{File, ItemFn, ItemMod, ItemUse};
+use syn::{ItemMod, ItemUse};
 
 use super::paths::{segments, use_leaves};
-use super::test_scope::{is_test_fn, is_test_module};
-use super::{Context, Finding, Rule};
+use super::test_scope::TestLines;
+use super::{FileContext, Finding, Rule};
 use crate::config::Layers;
-use crate::source::Source;
 
 const RELATIVE_ROOTS: [&str; 3] = ["crate", "self", "super"];
 
-struct LayerCheck<'config> {
-    layers: &'config Layers,
+struct LayerCheck<'run> {
+    layers: &'run Layers,
+    tests: &'run TestLines,
     module: Vec<String>,
     findings: Vec<Finding>,
-    test_depth: usize,
 }
 
 impl LayerCheck<'_> {
@@ -70,7 +69,7 @@ impl LayerCheck<'_> {
     }
 
     fn check(&mut self, line: usize, written: &[String]) {
-        if self.test_depth > 0 {
+        if self.tests.contains(line) {
             return;
         }
 
@@ -101,20 +100,10 @@ impl LayerCheck<'_> {
 }
 
 impl<'ast> Visit<'ast> for LayerCheck<'_> {
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        let is_test = is_test_fn(&function.attrs);
-        self.test_depth += usize::from(is_test);
-        visit::visit_item_fn(self, function);
-        self.test_depth -= usize::from(is_test);
-    }
-
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let is_test = is_test_module(&module.attrs);
-        self.test_depth += usize::from(is_test);
         self.module.push(module.ident.to_string());
         visit::visit_item_mod(self, module);
         self.module.pop();
-        self.test_depth -= usize::from(is_test);
     }
 
     fn visit_item_use(&mut self, import: &'ast ItemUse) {
@@ -153,18 +142,16 @@ fn module_path(relative: &Path) -> Option<Vec<String>> {
     Some(std::iter::once("crate".to_owned()).chain(parts).collect())
 }
 
-pub(super) fn check(source: &Source, file: &File, context: &Context) -> Vec<Finding> {
-    let config = context.config;
-
-    if context.in_tests() {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
+    if file.in_tests() {
         return Vec::new();
     }
 
-    let Some(relative) = config.relative(&source.path) else {
+    let Some(relative) = file.relative else {
         return Vec::new();
     };
 
-    config
+    file.config
         .layers
         .iter()
         .filter_map(|layers| {
@@ -172,11 +159,11 @@ pub(super) fn check(source: &Source, file: &File, context: &Context) -> Vec<Find
             let module = module_path(inside)?;
             let mut layer_check = LayerCheck {
                 layers,
+                tests: &file.tests,
                 module,
                 findings: Vec::new(),
-                test_depth: 0,
             };
-            layer_check.visit_file(file);
+            layer_check.visit_file(file.syntax);
 
             Some(layer_check.findings)
         })
@@ -190,17 +177,19 @@ mod tests {
 
     use super::{LayerCheck, module_path};
     use crate::config::Layers;
+    use crate::rules::test_scope::TestLines;
 
     fn violations(module: &str, text: &str) -> Vec<usize> {
         let layers = Layers {
             crate_root: ".".into(),
             order: vec!["crate::conn".to_owned(), "crate::proto".to_owned()],
         };
+        let tests = TestLines::default();
         let mut layer_check = LayerCheck {
             layers: &layers,
+            tests: &tests,
             module: module.split("::").map(str::to_owned).collect(),
             findings: Vec::new(),
-            test_depth: 0,
         };
         let file = syn::parse_file(text).unwrap();
         syn::visit::Visit::visit_file(&mut layer_check, &file);

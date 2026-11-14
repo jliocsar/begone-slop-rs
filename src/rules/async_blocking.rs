@@ -6,17 +6,15 @@
 //! `map`, say), unless it's handed to something that runs it elsewhere: `spawn_blocking`,
 //! `block_in_place`, `thread::spawn`, a scope's `spawn`. Macro arguments are read too.
 
-use std::collections::HashMap;
-
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
-    Expr, ExprAsync, ExprCall, ExprClosure, ExprMethodCall, File, ImplItemFn, Item, ItemFn, Macro,
+    Expr, ExprAsync, ExprCall, ExprClosure, ExprMethodCall, ImplItemFn, Item, ItemFn, Macro,
     TraitItemFn,
 };
 
-use super::paths::{file_imports, is_pure, macro_arguments, segments, starts_with};
-use super::{Finding, Rule};
+use super::paths::{Imports, is_pure, macro_arguments, segments, starts_with};
+use super::{FileContext, Finding, Rule};
 
 const BLOCKING: [(&str, &str); 6] = [
     ("reqwest::blocking", "`reqwest` without `blocking`"),
@@ -30,13 +28,13 @@ const BLOCKING: [(&str, &str); 6] = [
 /// Calls that run the closure they're given off the async thread.
 const OFFLOADERS: [&str; 3] = ["block_in_place", "spawn", "spawn_blocking"];
 
-struct AsyncBlocking {
-    imports: HashMap<String, Vec<String>>,
+struct AsyncBlocking<'run> {
+    imports: &'run Imports,
     async_depth: usize,
     findings: Vec<Finding>,
 }
 
-impl AsyncBlocking {
+impl AsyncBlocking<'_> {
     fn within(&mut self, depth: usize, walk: impl FnOnce(&mut Self)) {
         let outer = std::mem::replace(&mut self.async_depth, depth);
         walk(self);
@@ -58,7 +56,7 @@ impl AsyncBlocking {
     }
 }
 
-impl<'ast> Visit<'ast> for AsyncBlocking {
+impl<'ast> Visit<'ast> for AsyncBlocking<'_> {
     fn visit_expr_async(&mut self, block: &'ast ExprAsync) {
         let depth = self.async_depth + 1;
         self.within(depth, |check| visit::visit_expr_async(check, block));
@@ -118,18 +116,7 @@ impl<'ast> Visit<'ast> for AsyncBlocking {
 
     fn visit_path(&mut self, path: &'ast syn::Path) {
         if self.async_depth > 0 {
-            let written = segments(path);
-
-            let full: Vec<String> = match written.first().and_then(|first| self.imports.get(first))
-            {
-                Some(imported) => imported
-                    .iter()
-                    .chain(written.iter().skip(1))
-                    .cloned()
-                    .collect(),
-                None => written,
-            };
-
+            let full = self.imports.resolve(&segments(path));
             let blocking = BLOCKING
                 .iter()
                 .find(|(prefix, _)| starts_with(&full, prefix))
@@ -149,13 +136,13 @@ impl<'ast> Visit<'ast> for AsyncBlocking {
     }
 }
 
-pub(super) fn check(file: &File) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut check = AsyncBlocking {
-        imports: file_imports(file),
+        imports: &file.imports,
         async_depth: 0,
         findings: Vec::new(),
     };
-    check.visit_file(file);
+    check.visit_file(file.syntax);
     check.findings.dedup_by_key(|finding| finding.line);
 
     check.findings

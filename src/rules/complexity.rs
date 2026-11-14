@@ -7,11 +7,11 @@
 
 use syn::visit::{self, Visit};
 use syn::{
-    BinOp, Block, Expr, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprWhile, File,
-    Ident, ImplItemFn, Item, ItemFn, Local, TraitItemFn,
+    BinOp, Block, Expr, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprWhile, Ident,
+    ImplItemFn, Item, ItemFn, Local, TraitItemFn,
 };
 
-use super::{Finding, Rule};
+use super::{FileContext, Finding, Rule};
 
 const MAX_COMPLEXITY: usize = 15;
 
@@ -140,11 +140,11 @@ fn is_constructor(callee: &Expr) -> bool {
     })
 }
 
-pub(super) fn check(file: &File) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut functions = Functions {
         findings: Vec::new(),
     };
-    functions.visit_file(file);
+    functions.visit_file(file.syntax);
 
     functions.findings
 }

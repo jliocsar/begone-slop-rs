@@ -8,24 +8,22 @@
 //! unused binding. Test code is left alone: a test fails loudly on its own.
 
 use syn::visit::{self, Visit};
-use syn::{
-    Arm, Block, Expr, ExprAssign, ExprIf, ExprMethodCall, ItemFn, ItemMod, Local, Pat, Stmt,
-};
+use syn::{Arm, Block, Expr, ExprAssign, ExprIf, ExprMethodCall, Local, Pat, Stmt};
 
-use super::test_scope::{is_test_fn, is_test_module};
-use super::{Context, Finding, Rule};
+use super::test_scope::TestLines;
+use super::{FileContext, Finding, Rule};
 
 /// Calls whose result is a `Result` per item, so `.flatten()` on them drops each error.
 const FALLIBLE_ITEMS: [&str; 2] = ["read_dir", "lines"];
 
-struct SilentErrors {
+struct SilentErrors<'run> {
+    tests: &'run TestLines,
     findings: Vec<Finding>,
-    test_depth: usize,
 }
 
-impl SilentErrors {
+impl SilentErrors<'_> {
     fn push(&mut self, line: usize, rule: Rule, message: &str) {
-        if self.test_depth > 0 {
+        if self.tests.contains(line) {
             return;
         }
 
@@ -83,7 +81,7 @@ impl SilentErrors {
     }
 }
 
-impl<'ast> Visit<'ast> for SilentErrors {
+impl<'ast> Visit<'ast> for SilentErrors<'_> {
     fn visit_arm(&mut self, arm: &'ast Arm) {
         self.arm(arm);
         visit::visit_arm(self, arm);
@@ -109,20 +107,6 @@ impl<'ast> Visit<'ast> for SilentErrors {
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
         self.method(call);
         visit::visit_expr_method_call(self, call);
-    }
-
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        let is_test = is_test_fn(&function.attrs);
-        self.test_depth += usize::from(is_test);
-        visit::visit_item_fn(self, function);
-        self.test_depth -= usize::from(is_test);
-    }
-
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let is_test = is_test_module(&module.attrs);
-        self.test_depth += usize::from(is_test);
-        visit::visit_item_mod(self, module);
-        self.test_depth -= usize::from(is_test);
     }
 
     fn visit_local(&mut self, local: &'ast Local) {
@@ -257,12 +241,13 @@ fn yields_results(receiver: &Expr) -> bool {
     }
 }
 
-pub(super) fn check(file: &syn::File, context: &Context) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
+    let syntax = file.syntax;
     let mut silent = SilentErrors {
+        tests: &file.tests,
         findings: Vec::new(),
-        test_depth: usize::from(context.in_tests()),
     };
-    silent.visit_file(file);
+    silent.visit_file(syntax);
 
     silent.findings
 }

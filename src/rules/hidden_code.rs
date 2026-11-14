@@ -10,13 +10,13 @@ use std::path::Path;
 
 use quote::ToTokens;
 use syn::visit::{self, Visit};
-use syn::{Expr, ExprLit, File, ItemMod, Lit, Macro};
+use syn::{Expr, ExprLit, ItemMod, Lit, Macro};
 
-use super::{Context, Finding, Rule};
+use super::{FileContext, Finding, Rule};
 use crate::module_paths::{FileKind, children_directory, normalize, path_attribute, path_target};
 
 struct HiddenCode<'run> {
-    context: &'run Context<'run>,
+    file: &'run FileContext<'run>,
     children: std::path::PathBuf,
     inline: Vec<String>,
     findings: Vec<Finding>,
@@ -29,7 +29,7 @@ impl HiddenCode<'_> {
             Some(format!(
                 "`{written}`, which isn't a `.rs` file, so no rule reads the code in it; make it a `.rs` module"
             ))
-        } else if !self.context.listed.contains(target) {
+        } else if !self.file.listed.contains(target) {
             Some(format!(
                 "`{written}`, which isn't among the files git lists, so nothing checks it; track it, or move the code into the crate"
             ))
@@ -46,7 +46,7 @@ impl HiddenCode<'_> {
                 ..
             })) => {
                 let directory = self
-                    .context
+                    .file
                     .absolute
                     .parent()
                     .unwrap_or_else(|| Path::new(""));
@@ -79,7 +79,7 @@ impl<'ast> Visit<'ast> for HiddenCode<'_> {
         if module.content.is_none()
             && let Some(value) = path_attribute(&module.attrs)
         {
-            let target = path_target(&self.context.absolute, &self.children, &self.inline, &value);
+            let target = path_target(self.file.absolute, &self.children, &self.inline, &value);
 
             if let Some(message) = self.hidden(&target, &value) {
                 self.push(
@@ -126,14 +126,14 @@ fn is_out_dir(invocation: &Macro) -> bool {
     invocation.path.is_ident("concat") && tokens.starts_with("env!(\"OUT_DIR\")")
 }
 
-pub(super) fn check(file: &File, context: &Context) -> Vec<Finding> {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut hidden = HiddenCode {
-        context,
-        children: children_directory(&context.absolute, FileKind::Module),
+        file,
+        children: children_directory(file.absolute, FileKind::Module),
         inline: Vec::new(),
         findings: Vec::new(),
     };
-    hidden.visit_file(file);
+    hidden.visit_file(file.syntax);
 
     hidden.findings
 }

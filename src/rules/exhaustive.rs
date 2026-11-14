@@ -12,16 +12,16 @@
 use std::collections::HashSet;
 
 use syn::visit::{self, Visit};
-use syn::{ExprMatch, File, ItemEnum, ItemFn, ItemImpl, ItemMod, Pat, Path, Type};
+use syn::{ExprMatch, ItemEnum, ItemImpl, Pat, Path, Type};
 
-use super::test_scope::Scope;
-use super::{Context, Finding, Rule};
+use super::test_scope::TestLines;
+use super::{FileContext, Finding, Rule};
 
-struct Exhaustive {
+struct Exhaustive<'run> {
+    tests: &'run TestLines,
     enums: HashSet<String>,
     impl_self: Option<String>,
     findings: Vec<Finding>,
-    test_depth: usize,
 }
 
 #[derive(Default)]
@@ -29,7 +29,7 @@ struct LocalEnums {
     names: HashSet<String>,
 }
 
-impl Exhaustive {
+impl Exhaustive<'_> {
     /// The local enum a pattern names: `Kind::Use` and `self::Kind::Use` give `Kind`,
     /// `Self::Use` the impl's type. Any other path is another module's.
     fn enum_of(&self, path: &Path) -> Option<String> {
@@ -51,12 +51,6 @@ impl Exhaustive {
         }
     }
 
-    fn within(&mut self, scope: Scope, walk: impl FnOnce(&mut Self)) {
-        self.test_depth += scope.depth();
-        walk(self);
-        self.test_depth -= scope.depth();
-    }
-
     fn pattern_enum(&self, pattern: &Pat) -> Option<String> {
         match pattern {
             Pat::Path(path) => self.enum_of(&path.path),
@@ -71,7 +65,7 @@ impl Exhaustive {
     }
 }
 
-impl<'ast> Visit<'ast> for Exhaustive {
+impl<'ast> Visit<'ast> for Exhaustive<'_> {
     fn visit_expr_match(&mut self, matching: &'ast ExprMatch) {
         let local = matching
             .arms
@@ -79,14 +73,20 @@ impl<'ast> Visit<'ast> for Exhaustive {
             .find_map(|arm| self.pattern_enum(&arm.pat))
             .filter(|name| self.enums.contains(name));
 
-        if let Some(name) = local.filter(|_| self.test_depth == 0) {
+        if let Some(name) = local {
             for arm in matching
                 .arms
                 .iter()
                 .filter(|arm| arm.guard.is_none() && is_catch_all(&arm.pat))
             {
+                let line = arm.fat_arrow_token.spans[0].start().line;
+
+                if self.tests.contains(line) {
+                    continue;
+                }
+
                 self.findings.push(Finding {
-                    line: arm.fat_arrow_token.spans[0].start().line,
+                    line,
                     rule: Rule::NoWildcardOnLocalEnum,
                     message: format!(
                         "this catch-all hides the next variant added to `{name}`, which this file defines; list the variants so the compiler flags a new one"
@@ -97,12 +97,6 @@ impl<'ast> Visit<'ast> for Exhaustive {
         }
 
         visit::visit_expr_match(self, matching);
-    }
-
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.within(Scope::of_fn(&function.attrs), |exhaustive| {
-            visit::visit_item_fn(exhaustive, function);
-        });
     }
 
     fn visit_item_impl(&mut self, implementation: &'ast ItemImpl) {
@@ -117,12 +111,6 @@ impl<'ast> Visit<'ast> for Exhaustive {
 
         visit::visit_item_impl(self, implementation);
         self.impl_self = outer;
-    }
-
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        self.within(Scope::of_module(&module.attrs), |exhaustive| {
-            visit::visit_item_mod(exhaustive, module);
-        });
     }
 }
 
@@ -148,20 +136,20 @@ fn is_catch_all(pattern: &Pat) -> bool {
     }
 }
 
-pub(super) fn check(file: &File, context: &Context) -> Vec<Finding> {
-    if context.in_tests() {
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
+    if file.in_tests() {
         return Vec::new();
     }
 
     let mut local = LocalEnums::default();
-    local.visit_file(file);
+    local.visit_file(file.syntax);
     let mut exhaustive = Exhaustive {
+        tests: &file.tests,
         enums: local.names,
         impl_self: None,
         findings: Vec::new(),
-        test_depth: 0,
     };
-    exhaustive.visit_file(file);
+    exhaustive.visit_file(file.syntax);
 
     exhaustive.findings
 }

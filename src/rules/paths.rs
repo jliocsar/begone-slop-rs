@@ -26,11 +26,62 @@ const PURE: [&str; 16] = [
     "std::process::Termination",
 ];
 
+/// What each name imported at the top of the file stands for: `fs` → `std::fs`.
+#[derive(Debug, Default)]
+pub(super) struct Imports {
+    by_name: HashMap<String, Vec<String>>,
+}
+
 /// One leaf of a `use` tree: the name it binds here (none for a glob) and the full path.
 pub(super) struct UseLeaf {
     pub(super) local: Option<String>,
     pub(super) full: Vec<String>,
     pub(super) line: usize,
+}
+
+impl Imports {
+    /// The names the file's top-level `use` items bind.
+    pub(super) fn of(file: &File) -> Self {
+        let by_name = file
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Use(import) => Some(use_leaves(&import.tree)),
+                _ => None,
+            })
+            .flatten()
+            .filter_map(|leaf| Some((leaf.local?, leaf.full)))
+            .collect();
+
+        Self { by_name }
+    }
+
+    /// The full path `name` was imported as, if a `use` brought it in.
+    pub(super) fn get(&self, name: &str) -> Option<&[String]> {
+        self.by_name.get(name).map(Vec::as_slice)
+    }
+
+    pub(super) fn contains(&self, name: &str) -> bool {
+        self.by_name.contains_key(name)
+    }
+
+    /// `written` with its first segment read through the imports: `fs::read` after
+    /// `use std::fs` is `std::fs::read`. A path that starts with no imported name stays as is.
+    pub(super) fn resolve(&self, written: &[String]) -> Vec<String> {
+        written
+            .first()
+            .and_then(|first| self.get(first))
+            .map_or_else(
+                || written.to_vec(),
+                |imported| {
+                    imported
+                        .iter()
+                        .chain(written.iter().skip(1))
+                        .cloned()
+                        .collect()
+                },
+            )
+    }
 }
 
 /// Whether `full` names one of the [`PURE`] values.
@@ -67,19 +118,6 @@ pub(super) fn starts_with(full: &[String], prefix: &str) -> bool {
     let wanted: Vec<&str> = prefix.split("::").collect();
 
     full.len() >= wanted.len() && full.iter().zip(&wanted).all(|(have, want)| have == want)
-}
-
-/// What each name imported at the top of the file stands for: `fs` → `std::fs`.
-pub(super) fn file_imports(file: &File) -> HashMap<String, Vec<String>> {
-    file.items
-        .iter()
-        .filter_map(|item| match item {
-            Item::Use(import) => Some(use_leaves(&import.tree)),
-            _ => None,
-        })
-        .flatten()
-        .filter_map(|leaf| Some((leaf.local?, leaf.full)))
-        .collect()
 }
 
 fn collect(tree: &UseTree, prefix: &[String], leaves: &mut Vec<UseLeaf>) {
@@ -121,5 +159,28 @@ fn collect(tree: &UseTree, prefix: &[String], leaves: &mut Vec<UseLeaf>) {
                 collect(item, prefix, leaves);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Imports;
+
+    fn resolved(imports: &str, written: &str) -> String {
+        let file = syn::parse_file(imports).unwrap();
+        let written: Vec<String> = written.split("::").map(str::to_owned).collect();
+
+        Imports::of(&file).resolve(&written).join("::")
+    }
+
+    #[test]
+    fn a_path_resolves_through_its_first_segment() {
+        let imports =
+            "use std::fs;\nuse std::io::{self, Write as _};\nuse std::process::Command as Run;\n";
+
+        assert_eq!(resolved(imports, "fs::read"), "std::fs::read");
+        assert_eq!(resolved(imports, "io::stdout"), "std::io::stdout");
+        assert_eq!(resolved(imports, "Run::new"), "std::process::Command::new");
+        assert_eq!(resolved(imports, "other::fs"), "other::fs");
     }
 }

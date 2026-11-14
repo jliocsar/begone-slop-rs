@@ -3,33 +3,19 @@
 //! The Rust reading of begone-slop's `expect-padding`. The run is the test's verdict, so it
 //! reads as one paragraph, fenced off from the setup above it.
 
+use syn::Block;
 use syn::visit::{self, Visit};
-use syn::{Block, File, ItemFn, ItemMod};
 
 use super::gap::{forbid_blank, require_blank};
-use super::test_scope::Scope;
 use super::unit::{Kind, Unit};
-use super::{Context, Finding, Rule};
-use crate::source::Source;
+use super::{FileContext, Finding, Rule};
 
-struct AssertPadding<'source> {
-    source: &'source Source,
+struct AssertPadding<'run> {
+    file: &'run FileContext<'run>,
     findings: Vec<Finding>,
-    test_file: bool,
-    test_depth: usize,
 }
 
 impl AssertPadding<'_> {
-    fn in_tests(&self) -> bool {
-        self.test_file || self.test_depth > 0
-    }
-
-    fn within(&mut self, scope: Scope, walk: impl FnOnce(&mut Self)) {
-        self.test_depth += scope.depth();
-        walk(self);
-        self.test_depth -= scope.depth();
-    }
-
     fn sequence(&mut self, block: &Block) {
         let units: Vec<Unit> = block.stmts.iter().map(Unit::of_stmt).collect();
 
@@ -44,14 +30,14 @@ impl AssertPadding<'_> {
 
             let finding = if previous_asserts && next_asserts {
                 forbid_blank(
-                    self.source,
+                    self.file.source,
                     gap,
                     Rule::AssertPadding,
                     "inside a run of assertions",
                 )
             } else if previous_asserts || next_asserts {
                 require_blank(
-                    self.source,
+                    self.file.source,
                     gap,
                     Rule::AssertPadding,
                     "around a run of assertions",
@@ -67,35 +53,23 @@ impl AssertPadding<'_> {
 
 impl<'ast> Visit<'ast> for AssertPadding<'_> {
     fn visit_block(&mut self, block: &'ast Block) {
-        if self.in_tests() {
+        if self
+            .file
+            .is_test(block.brace_token.span.open().start().line)
+        {
             self.sequence(block);
         }
 
         visit::visit_block(self, block);
     }
-
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.within(Scope::of_fn(&function.attrs), |padding| {
-            visit::visit_item_fn(padding, function);
-        });
-    }
-
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        self.within(Scope::of_module(&module.attrs), |padding| {
-            visit::visit_item_mod(padding, module);
-        });
-    }
 }
 
-pub(super) fn check(source: &Source, file: &File, context: &Context) -> Vec<Finding> {
-    let test_file = context.in_tests();
+pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut padding = AssertPadding {
-        source,
+        file,
         findings: Vec::new(),
-        test_file,
-        test_depth: 0,
     };
-    padding.visit_file(file);
+    padding.visit_file(file.syntax);
 
     padding.findings
 }
