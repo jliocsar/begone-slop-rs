@@ -2,13 +2,49 @@
 
 use std::collections::HashMap;
 
-use syn::{File, Item, Path, UseTree};
+use syn::punctuated::Punctuated;
+use syn::{Expr, File, Item, Macro, Path, Token, UseTree};
+
+/// Values that sit under an effectful module but touch nothing: an address is data, and so is
+/// an exit code. Naming one isn't an effect.
+const PURE: [&str; 16] = [
+    "std::env::consts",
+    "std::fs::FileType",
+    "std::fs::Metadata",
+    "std::fs::Permissions",
+    "std::net::AddrParseError",
+    "std::net::IpAddr",
+    "std::net::Ipv4Addr",
+    "std::net::Ipv6Addr",
+    "std::net::Shutdown",
+    "std::net::SocketAddr",
+    "std::net::SocketAddrV4",
+    "std::net::SocketAddrV6",
+    "std::process::ExitCode",
+    "std::process::ExitStatus",
+    "std::process::Output",
+    "std::process::Termination",
+];
 
 /// One leaf of a `use` tree: the name it binds here (none for a glob) and the full path.
 pub(super) struct UseLeaf {
     pub(super) local: Option<String>,
     pub(super) full: Vec<String>,
     pub(super) line: usize,
+}
+
+/// Whether `full` names one of the [`PURE`] values.
+pub(super) fn is_pure(full: &[String]) -> bool {
+    PURE.iter().any(|prefix| starts_with(full, prefix))
+}
+
+/// A macro's arguments, when they read as comma-separated expressions (`format!`, `println!`,
+/// `assert_eq!`, `vec!`, `write!`). Anything else comes back empty.
+pub(super) fn macro_arguments(invocation: &Macro) -> Vec<Expr> {
+    invocation
+        .parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated)
+        .map(|arguments| arguments.into_iter().collect())
+        .unwrap_or_default()
 }
 
 pub(super) fn segments(path: &Path) -> Vec<String> {

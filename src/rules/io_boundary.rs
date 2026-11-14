@@ -12,13 +12,15 @@ use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{File, ItemFn, ItemMod, ItemUse, Macro};
 
-use super::paths::{UseLeaf, file_imports, segments, starts_with, use_leaves};
+use super::paths::{
+    UseLeaf, file_imports, is_pure, macro_arguments, segments, starts_with, use_leaves,
+};
 use super::test_scope::{is_test_fn, is_test_module};
 use super::{Context, Finding, Rule};
 use crate::config::{Config, IoBoundary};
 use crate::source::Source;
 
-const EFFECTS: [(&str, &str); 23] = [
+const EFFECTS: [(&str, &str); 28] = [
     ("chrono::Local::now", "the clock"),
     ("chrono::Utc::now", "the clock"),
     ("fastrand", "randomness"),
@@ -31,10 +33,15 @@ const EFFECTS: [(&str, &str); 23] = [
     ("std::io::stdin", "stdio"),
     ("std::io::stdout", "stdio"),
     ("std::net", "the network"),
+    ("std::os::unix::fs", "the file system"),
+    ("std::os::unix::net", "the network"),
     ("std::process", "processes"),
     ("std::time::Instant::now", "the clock"),
     ("std::time::SystemTime::now", "the clock"),
     ("tokio::fs", "the file system"),
+    ("tokio::io::stderr", "stdio"),
+    ("tokio::io::stdin", "stdio"),
+    ("tokio::io::stdout", "stdio"),
     ("tokio::net", "the network"),
     ("tokio::process", "processes"),
     ("tokio::signal", "signals"),
@@ -44,7 +51,7 @@ const EFFECTS: [(&str, &str); 23] = [
     ("ureq", "the network"),
 ];
 
-const PRINT_MACROS: [&str; 4] = ["eprint", "eprintln", "print", "println"];
+const PRINT_MACROS: [&str; 5] = ["dbg", "eprint", "eprintln", "print", "println"];
 
 struct IoCheck<'config> {
     boundary: &'config IoBoundary,
@@ -60,6 +67,10 @@ impl IoCheck<'_> {
     }
 
     fn effect_of(&self, full: &[String]) -> Option<String> {
+        if is_pure(full) {
+            return None;
+        }
+
         let built_in = EFFECTS
             .iter()
             .find(|(prefix, _)| starts_with(full, prefix))
@@ -130,6 +141,10 @@ impl<'ast> Visit<'ast> for IoCheck<'_> {
                 &format!("{name}!"),
                 "stdio",
             );
+        }
+
+        for argument in macro_arguments(invocation) {
+            self.visit_expr(&argument);
         }
 
         visit::visit_macro(self, invocation);
@@ -251,6 +266,20 @@ mod tests {
         let text = "use std::io;\n\nfn greet() {\n    io::stdout();\n    println!(\"hi\");\n}\n";
 
         assert_eq!(io_lines(text), [4, 5]);
+    }
+
+    #[test]
+    fn pure_values_under_effect_modules_pass() {
+        let text = "use std::net::SocketAddr;\nuse std::process::ExitCode;\nuse std::env::consts::OS;\n\nfn main() -> ExitCode {\n    let local: std::net::IpAddr = LOCAL;\n}\n";
+
+        assert_eq!(io_lines(text), NONE);
+    }
+
+    #[test]
+    fn effects_inside_macro_arguments_are_reported() {
+        let text = "fn sneaky() -> String {\n    format!(\"{}\", std::fs::read_to_string(PATH).unwrap_or_default())\n}\n";
+
+        assert_eq!(io_lines(text), [2]);
     }
 
     #[test]

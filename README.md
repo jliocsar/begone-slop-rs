@@ -117,7 +117,9 @@ order = ["crate::conn", "crate::proto"]
 - `io-boundary`: functional core, imperative shell. Outside `allowed`, nothing may reach the file
   system, network, processes, environment, stdio (`print!` and friends included), clock,
   randomness or signals. It's checked where an effect is imported, and where a full path names it
-  in code. Test code is exempt.
+  in code, macro arguments (`format!`, `dbg!`) included. Values that only live under those modules
+  (`SocketAddr`, `IpAddr`, `ExitCode`, `std::env::consts`, `fs::Metadata`) aren't effects. Test
+  code is exempt.
 - `layers`: each `use`, and each path written from `crate`/`self`/`super`, points down the
   declared order. Between crates, Cargo's dependency graph already does this.
 
@@ -170,7 +172,7 @@ The Effect rules have no Rust counterpart. `no-switch` doesn't port, since `matc
 | `no-boolean-trap`      | a `bool` parameter; take a two-variant enum that names both cases                     |  —  |
 | `no-stringly-fields`   | a `kind`/`status`/`state`/`mode`/`level`/`role`… field or parameter typed as a string (parse fns exempt) |  —  |
 | `no-wildcard-on-local-enum` | `_ =>` or a catch-all binding on an enum this file defines (`Enum::V`, `self::Enum::V`, `Self::V`; not `other::Enum::V`), outside tests |  —  |
-| `no-blocking-in-async` | `std::fs`, `std::net`, `std::thread::sleep`, `std::process::Command`, blocking HTTP inside `async` |  —  |
+| `no-blocking-in-async` | `std::fs`, `std::net`, `std::thread::sleep`, `std::process::Command`, blocking HTTP inside `async` (macro arguments, trait defaults and in-place closures like `map` included; a closure handed to `spawn_blocking`/`spawn`/`block_in_place` isn't) |  —  |
 | `no-numbered-names`    | `item2` next to `item`, or `point1` next to `point2`                                  |  —  |
 | `no-type-in-name`      | `user_vec`, `name_str`, `lookup_hashmap`: the type already says it                    |  —  |
 | `no-junk-drawer-modules` | modules named `utils`, `helpers`, `common`, `misc`                                  |  —  |
