@@ -272,6 +272,7 @@ impl Setting<'_> {
 /// The settings in `project` that are looser than the same settings in `preset`.
 pub(super) fn loosened(preset: &Table, project: &Table) -> Vec<Loosened> {
     let mut keys: Vec<&String> = preset.keys().chain(project.keys()).collect();
+
     keys.sort();
     keys.dedup();
 

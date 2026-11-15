@@ -1,0 +1,205 @@
+//! Each kind of statement against its neighbours.
+
+fn lets_group_together_and_stand_apart() -> u8 {
+    let left = 1;
+    let right = 2;
+    let total = add(
+        left,
+        right,
+    );
+    record(total); //~ padding
+    let shown = total; //~ padding
+
+    shown
+}
+
+fn a_let_after_a_statement() {
+    prepare();
+    let ready = true; //~ padding
+
+    go(ready);
+}
+
+fn the_first_and_the_last_are_free() {
+    let first = 1;
+
+    go(first);
+    finish();
+}
+
+fn every_kind_of_block() {
+    prepare();
+    if ready() { //~ padding
+        go();
+    }
+    prepare(); //~ padding
+    if let Some(next) = peek() { //~ padding
+        go_to(next);
+    } else if waiting() {
+        wait();
+    } else {
+        stop();
+    }
+    prepare(); //~ padding
+    for item in items() { //~ padding
+        go_to(item);
+    }
+    while busy() { //~ padding
+        wait();
+    }
+    while let Some(next) = pop() { //~ padding
+        go_to(next);
+    }
+    loop { //~ padding
+        break;
+    }
+    match mode() { //~ padding
+        Mode::Fast => go(),
+        Mode::Slow => wait(),
+    }
+    'outer: { //~ padding
+        break 'outer;
+    }
+    // SAFETY: nothing here is unsafe.
+    unsafe { //~ padding
+        go();
+    }
+    finish(); //~ padding
+}
+
+fn a_one_line_guard_is_a_block(ready: Ready) {
+    prepare();
+    if ready.is_no() { return; } //~ padding
+    go(); //~ padding
+}
+
+fn a_return_and_a_value(ready: Ready) -> u8 {
+    if ready.is_yes() {
+        prepare();
+        return 1; //~ padding
+    }
+
+    let fallback = 2;
+    fallback //~ padding
+}
+
+fn a_lone_value_is_free() -> u8 {
+    total()
+}
+
+fn a_value_after_a_call() -> u8 {
+    prepare();
+    total() //~ padding
+}
+
+fn a_unit_value_counts_too(ready: Ready) {
+    if ready.is_yes() {
+        prepare();
+        go() //~ padding
+    }
+}
+
+fn a_block_with_a_call_hung_off_it(mode: Mode) {
+    prepare();
+    match mode { //~ padding
+        Mode::Fast => app(),
+        Mode::Slow => other(),
+    }
+    .run();
+    finish(); //~ padding
+}
+
+fn let_else(input: Option<u8>) -> u8 {
+    let Some(value) = input else { return 0 };
+    let doubled = value * 2;
+    record(doubled); //~ padding
+    let Some(bigger) = doubled.checked_mul(2) else { //~ padding
+        return 0;
+    };
+    record(bigger); //~ padding
+
+    bigger
+}
+
+fn closures(items: &[u8]) -> Vec<u8> {
+    let double = |item: &u8| {
+        let doubled = item * 2;
+        record(doubled); //~ padding
+        doubled //~ padding
+    };
+    let shown = items.iter().map(double).collect(); //~ padding
+    items.iter().for_each(|item| { //~ padding
+        prepare();
+        let seen = *item; //~ padding
+
+        record(seen);
+    });
+
+    shown
+}
+
+fn match_arms_are_free(mode: Mode) -> u8 {
+    match mode {
+        Mode::Fast => 1,
+        Mode::Slow => {
+            prepare();
+            let slow = 2; //~ padding
+
+            slow
+        }
+    }
+}
+
+fn nested_blocks(ready: Ready) {
+    if ready.is_yes() {
+        let first = 1;
+        if first > 0 { //~ padding
+            prepare();
+            let second = first; //~ padding
+            go_to(second); //~ padding
+        }
+    }
+}
+
+fn one_line_blocks_are_free() -> u8 {
+    let total = { let left = 1; left + 1 };
+    total + 1 //~ padding
+}
+
+fn macros(ready: Ready) {
+    let value = 1;
+    println!("{value}"); //~ padding
+    select! { //~ padding
+        next = recv() => {
+            prepare();
+            let got = next; //~ padding
+            if got.is_some() { //~ padding
+                go();
+            }
+        }
+    }
+    finish(); //~ padding
+    run(|| {
+        prepare();
+        let inside = ready; //~ padding
+
+        record(inside);
+    });
+}
+
+macro_rules! templates_are_free {
+    ($value:expr) => {{
+        prepare();
+        let held = $value;
+        held
+    }};
+}
+
+fn statement_items() {
+    prepare();
+    const LIMIT: u8 = 1; //~ padding
+    let limit = LIMIT; //~ padding
+    fn helper() {} //~ padding
+    helper(); //~ padding
+    record(limit);
+}

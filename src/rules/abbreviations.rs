@@ -105,6 +105,7 @@ impl<'ast> Visit<'ast> for Abbreviations {
 
     fn visit_item_impl(&mut self, implementation: &'ast ItemImpl) {
         let outer = self.in_trait_impl;
+
         self.in_trait_impl = implementation.trait_.is_some();
         visit::visit_item_impl(self, implementation);
         self.in_trait_impl = outer;
@@ -177,6 +178,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         findings: Vec::new(),
         in_trait_impl: false,
     };
+
     abbreviations.visit_file(file.syntax);
 
     abbreviations.findings

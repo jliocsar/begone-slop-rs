@@ -168,6 +168,7 @@ pub fn check(root: &Path) -> Vec<Drift> {
     let variables: Vec<(String, String)> = std::env::vars().collect();
 
     let mut drifts = manifests(root, &preset_entries);
+
     drifts.extend(clippy_configs(root, &preset_settings));
     drifts.extend(cargo_configs(root, &preset_entries));
     drifts.extend(
@@ -285,6 +286,7 @@ fn turned_down<'table>(
     preset_entries: &[Entry],
 ) -> BTreeMap<Option<&'table str>, Vec<Lowered>> {
     let mut names: Vec<&str> = lints::known().collect();
+
     names.extend(
         entries
             .iter()
@@ -444,6 +446,7 @@ fn clippy_configs(root: &Path, preset: &Table) -> Vec<Drift> {
     };
 
     let mut configs = files::named(root, &CLIPPY_FILES);
+
     configs.push(nearest);
     configs.sort();
     configs.dedup();
@@ -478,6 +481,7 @@ fn cargo_configs(root: &Path, preset_entries: &[Entry]) -> Vec<Drift> {
 
     if let Some(home) = std::env::var_os("CARGO_HOME") {
         let home = PathBuf::from(home);
+
         paths.extend(["config.toml", "config"].iter().map(|name| home.join(name)));
     }
 
@@ -515,6 +519,7 @@ mod tests {
 
         for (name, text) in files {
             let path = directory.join(name);
+
             fs::create_dir_all(path.parent().unwrap()).unwrap();
             fs::write(path, text).unwrap();
         }
@@ -529,6 +534,7 @@ mod tests {
             .filter(|drift| drift.path.starts_with(&directory))
             .map(|drift| drift.message)
             .collect();
+
         fs::remove_dir_all(&directory).unwrap();
 
         messages

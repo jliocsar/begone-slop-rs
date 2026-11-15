@@ -143,6 +143,7 @@ fn is_plain(expr: &Expr) -> bool {
     }
 
     let mut jumps = Jumps(false);
+
     jumps.visit_expr(expr);
 
     !jumps.0
@@ -152,6 +153,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut accumulators = Accumulators {
         findings: Vec::new(),
     };
+
     accumulators.visit_file(file.syntax);
 
     accumulators.findings

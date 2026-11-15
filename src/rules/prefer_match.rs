@@ -45,6 +45,7 @@ impl PreferMatch {
 impl<'ast> Visit<'ast> for PreferMatch {
     fn visit_impl_item_fn(&mut self, method: &'ast ImplItemFn) {
         let parses = is_parse_name(&method.sig.ident.to_string());
+
         self.parse_depth += usize::from(parses);
         visit::visit_impl_item_fn(self, method);
         self.parse_depth -= usize::from(parses);
@@ -52,6 +53,7 @@ impl<'ast> Visit<'ast> for PreferMatch {
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
         let parses = is_parse_name(&function.sig.ident.to_string());
+
         self.parse_depth += usize::from(parses);
         visit::visit_item_fn(self, function);
         self.parse_depth -= usize::from(parses);
@@ -63,6 +65,7 @@ impl<'ast> Visit<'ast> for PreferMatch {
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
             .is_some_and(|segment| PARSE_TRAITS.iter().any(|name| segment.ident == name));
+
         self.parse_depth += usize::from(parses);
         visit::visit_item_impl(self, implementation);
         self.parse_depth -= usize::from(parses);
@@ -169,6 +172,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         findings: Vec::new(),
         parse_depth: 0,
     };
+
     prefer_match.visit_file(file.syntax);
 
     prefer_match.findings

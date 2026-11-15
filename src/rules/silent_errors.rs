@@ -247,6 +247,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         tests: &file.tests,
         findings: Vec::new(),
     };
+
     silent.visit_file(syntax);
 
     silent.findings

@@ -244,7 +244,9 @@ fn run_check(options: &Options) -> Result<ExitCode, Fatal> {
     }
 
     problems += drifts.len();
+
     let (found, fixed) = check_files(&paths, options.mode, &project);
+
     problems += found;
 
     let patterns = if options.ast_grep {

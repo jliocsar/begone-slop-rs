@@ -1,0 +1,30 @@
+//@ path: tests/sample.rs
+//! Assertions next to `let`s, blocks and comments, which `padding` leaves to this rule.
+
+#[test]
+fn a_let_then_an_assertion_is_reported_once() {
+    let sum = 1 + 1;
+    assert_eq!(sum, 2); //~ assert-padding
+    assert!(sum > 0);
+    let more = sum + 1; //~ assert-padding
+
+    assert_eq!(more, 3);
+}
+
+#[test]
+fn the_blank_line_goes_above_the_comment() {
+    let sum = 1 + 1;
+    // The verdict.
+
+    assert_eq!(sum, 2); //~ assert-padding
+}
+
+#[test]
+fn a_block_before_an_assertion_is_reported_by_both() {
+    let ready = true;
+
+    if ready {
+        go();
+    }
+    assert!(ready); //~ padding, assert-padding
+}

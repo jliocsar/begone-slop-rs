@@ -203,6 +203,7 @@ pub fn findings_in(source: &Source, context: &Context) -> Result<Vec<Finding>, C
         cause,
     })?;
     let findings = rules::run(&FileContext::new(source, &file, context));
+
     proc_macro2::extra::invalidate_current_thread_spans();
 
     Ok(findings)

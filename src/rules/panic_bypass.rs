@@ -85,6 +85,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         findings: Vec::new(),
         const_depth: 0,
     };
+
     bypass.visit_file(file.syntax);
 
     bypass.findings

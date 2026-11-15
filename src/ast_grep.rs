@@ -78,6 +78,7 @@ pub fn scan(files: &[PathBuf], mode: Mode) -> Result<bool, AstGrepError> {
 
     let rules: Vec<&str> = RULES.iter().map(|(_, text)| *text).collect();
     let mut command = Command::new("ast-grep");
+
     command
         .args(["scan", "--config", EMPTY_CONFIG, "--inline-rules"])
         .arg(rules.join("\n---\n"));
@@ -117,7 +118,9 @@ mod tests {
             .map(|entry| entry.unwrap().path())
             .filter_map(|path| Some(path.file_stem()?.to_str()?.to_owned()))
             .collect();
+
         on_disk.sort();
+
         let embedded: Vec<&str> = RULES.iter().map(|(id, _)| *id).collect();
 
         assert_eq!(on_disk, embedded);
@@ -141,7 +144,9 @@ mod tests {
             .lines()
             .filter_map(|line| Some(line.strip_prefix("| `")?.split_once('`')?.0))
             .collect();
+
         listed.sort_unstable();
+
         let ids: Vec<&str> = RULES.iter().map(|(id, _)| *id).collect();
 
         assert_eq!(listed, ids);

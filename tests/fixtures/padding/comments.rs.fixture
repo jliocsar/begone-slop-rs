@@ -1,0 +1,49 @@
+//! Comments, doc comments and attributes above a statement.
+
+fn a_comment_introduces_what_follows() {
+    prepare();
+    // Then the rest.
+    let ready = true; //~ padding
+
+    go(ready);
+}
+
+fn the_blank_line_goes_above_the_comment() {
+    prepare();
+    // Then the rest.
+
+    let ready = true; //~ padding
+
+    go(ready);
+}
+
+fn a_comment_inside_a_group_of_lets_is_free() {
+    let left = 1;
+    // The right one.
+    let right = 2;
+
+    add(left, right);
+}
+
+fn an_attribute_belongs_to_its_statement() {
+    prepare();
+    #[cfg(feature = "slow")] //~ padding
+    let probe = 1;
+    #[cfg(feature = "fast")] //~ padding
+    wait();
+}
+
+fn a_trailing_comment_stays_with_its_line() -> u8 {
+    prepare(); // first
+    let total = 1; //~ padding
+
+    total
+}
+
+fn a_doc_comment_on_an_inner_item() {
+    prepare();
+    /// Helps. //~ padding
+    fn helper() {}
+
+    helper();
+}

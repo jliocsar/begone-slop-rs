@@ -108,6 +108,7 @@ pub(super) fn segments(path: &Path) -> Vec<String> {
 /// `use a::{b, c::d as e, f::*}` gives `b → a::b`, `e → a::c::d` and a glob `a::f`.
 pub(super) fn use_leaves(tree: &UseTree) -> Vec<UseLeaf> {
     let mut leaves = Vec::new();
+
     collect(tree, &[], &mut leaves);
 
     leaves
@@ -123,6 +124,7 @@ pub(super) fn starts_with(full: &[String], prefix: &str) -> bool {
 fn collect(tree: &UseTree, prefix: &[String], leaves: &mut Vec<UseLeaf>) {
     let joined = |name: String| {
         let mut full = prefix.to_vec();
+
         full.push(name);
 
         full

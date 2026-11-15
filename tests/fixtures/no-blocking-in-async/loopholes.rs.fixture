@@ -25,5 +25,6 @@ async fn channels(receiver: std::sync::mpsc::Receiver<u8>, lock: &std::sync::Mut
 
 async fn connect(address: std::net::SocketAddr) {
     let parsed: std::net::IpAddr = "127.0.0.1".parse().unwrap();
+
     tokio::net::TcpStream::connect(address).await;
 }

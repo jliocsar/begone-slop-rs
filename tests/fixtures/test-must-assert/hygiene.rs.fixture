@@ -19,6 +19,7 @@ mod tests {
     #[test]
     fn name_collision_counts_as_asserting() { //~ test-must-assert
         let server = Server::new();
+
         server.run();
     }
 
@@ -26,6 +27,7 @@ mod tests {
     fn aliased_sleep() { //~ test-must-assert
         pause(Duration::from_millis(50));
         tokio::time::sleep_until(Instant::now()).await;
+
         let deadline = Instant::now() + Duration::from_millis(50);
         while Instant::now() < deadline {} //~ padding
 

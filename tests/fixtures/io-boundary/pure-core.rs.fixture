@@ -17,11 +17,16 @@ fn status(failed: Failed) -> ExitCode {
 fn sneaky() -> String {
     let text = format!("{}", std::fs::read_to_string("secrets").unwrap_or_default()); //~ io-boundary
     let stamp = std::time::UNIX_EPOCH.elapsed();
+
     std::os::unix::fs::symlink("a", "b"); //~ io-boundary
+
     let token = uuid::Uuid::new_v4(); //~ io-boundary
     let out = tokio::io::stdout(); //~ io-boundary
+
     dbg!(&text); //~ io-boundary
+
     let laundered = disk::read_to_string("x");
     let more = crate::shell::load_config();
+
     text
 }

@@ -69,6 +69,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         file,
         findings: Vec::new(),
     };
+
     padding.visit_file(file.syntax);
 
     padding.findings

@@ -37,6 +37,7 @@ struct AsyncBlocking<'run> {
 impl AsyncBlocking<'_> {
     fn within(&mut self, depth: usize, walk: impl FnOnce(&mut Self)) {
         let outer = std::mem::replace(&mut self.async_depth, depth);
+
         walk(self);
         self.async_depth = outer;
     }
@@ -59,6 +60,7 @@ impl AsyncBlocking<'_> {
 impl<'ast> Visit<'ast> for AsyncBlocking<'_> {
     fn visit_expr_async(&mut self, block: &'ast ExprAsync) {
         let depth = self.async_depth + 1;
+
         self.within(depth, |check| visit::visit_expr_async(check, block));
     }
 
@@ -74,6 +76,7 @@ impl<'ast> Visit<'ast> for AsyncBlocking<'_> {
 
     fn visit_expr_closure(&mut self, closure: &'ast ExprClosure) {
         let depth = self.async_depth + usize::from(closure.asyncness.is_some());
+
         self.within(depth, |check| visit::visit_expr_closure(check, closure));
     }
 
@@ -89,6 +92,7 @@ impl<'ast> Visit<'ast> for AsyncBlocking<'_> {
 
     fn visit_impl_item_fn(&mut self, method: &'ast ImplItemFn) {
         let depth = usize::from(method.sig.asyncness.is_some());
+
         self.within(depth, |check| visit::visit_impl_item_fn(check, method));
     }
 
@@ -98,11 +102,13 @@ impl<'ast> Visit<'ast> for AsyncBlocking<'_> {
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
         let depth = usize::from(function.sig.asyncness.is_some());
+
         self.within(depth, |check| visit::visit_item_fn(check, function));
     }
 
     fn visit_trait_item_fn(&mut self, method: &'ast TraitItemFn) {
         let depth = usize::from(method.sig.asyncness.is_some());
+
         self.within(depth, |check| visit::visit_trait_item_fn(check, method));
     }
 
@@ -142,6 +148,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         async_depth: 0,
         findings: Vec::new(),
     };
+
     check.visit_file(file.syntax);
     check.findings.dedup_by_key(|finding| finding.line);
 

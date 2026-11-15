@@ -133,6 +133,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         inline: Vec::new(),
         findings: Vec::new(),
     };
+
     hidden.visit_file(file.syntax);
 
     hidden.findings

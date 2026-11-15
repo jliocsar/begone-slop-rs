@@ -1,7 +1,7 @@
 //! Statements and items reduced to what the padding rules judge: a line range and a kind.
 
 use syn::spanned::Spanned;
-use syn::{Expr, ImplItem, Item, Local, Macro, Stmt, TraitItem, Visibility};
+use syn::{Block, Expr, ImplItem, Item, Local, Macro, MacroDelimiter, Stmt, TraitItem, Visibility};
 
 use super::gap::Gap;
 
@@ -19,10 +19,16 @@ const ASSERT_MACROS: [&str; 7] = [
 pub(super) enum Kind {
     Assert,
     BlockLike,
-    Const { public: bool },
+    Const {
+        public: bool,
+    },
     ItemBlock,
+    /// A `let` that doesn't own a block of its own.
+    Let,
     Other,
     Return,
+    /// A block's value: its last expression, with no `;` after it.
+    Tail,
     Use,
 }
 
@@ -62,10 +68,25 @@ impl Unit {
             Stmt::Local(local) => local_kind(local, height),
             Stmt::Item(item) => item_kind(item, height),
             Stmt::Expr(expr, _) => expr_kind(expr, height),
-            Stmt::Macro(statement) => macro_kind(&statement.mac),
+            Stmt::Macro(statement) => statement_macro_kind(&statement.mac, height),
         };
 
         Self { start, end, kind }
+    }
+
+    /// A block's statements, with its value, the last expression with no `;`, as a
+    /// [`Kind::Tail`] unless it's a block or a `return` already.
+    pub(super) fn of_block(block: &Block) -> Vec<Self> {
+        let mut units: Vec<Self> = block.stmts.iter().map(Self::of_stmt).collect();
+
+        if let (Some(last), Some(unit)) = (block.stmts.last(), units.last_mut())
+            && is_value(last)
+            && unit.kind == Kind::Other
+        {
+            unit.kind = Kind::Tail;
+        }
+
+        units
     }
 
     pub(super) fn of_item(item: &Item) -> Self {
@@ -152,31 +173,62 @@ fn owns_block(expr: &Expr) -> bool {
     )
 }
 
+/// Whether `expr` starts with a block: `match x { .. }.run()` and `async { .. }.await` are
+/// blocks with a call or an `.await` hung off the end.
+fn leads_with_block(expr: &Expr) -> bool {
+    let mut head = expr;
+
+    loop {
+        head = match head {
+            Expr::Await(awaited) => &awaited.base,
+            Expr::Field(field) => &field.base,
+            Expr::MethodCall(call) => &call.receiver,
+            Expr::Try(tried) => &tried.expr,
+            _ => return owns_block(head),
+        };
+    }
+}
+
 fn is_block_closure(expr: &Expr) -> bool {
     matches!(expr, Expr::Closure(closure) if matches!(*closure.body, Expr::Block(_)))
+}
+
+/// Whether the statement, when it's last, is the block's value.
+fn is_value(stmt: &Stmt) -> bool {
+    match stmt {
+        Stmt::Expr(_, semicolon) => semicolon.is_none(),
+        Stmt::Macro(statement) => {
+            statement.semi_token.is_none()
+                && !matches!(statement.mac.delimiter, MacroDelimiter::Brace(_))
+        }
+        Stmt::Local(_) | Stmt::Item(_) => false,
+    }
 }
 
 fn expr_kind(expr: &Expr, height: Height) -> Kind {
     match expr {
         Expr::Return(_) => Kind::Return,
         Expr::Macro(invocation) => macro_kind(&invocation.mac),
-        Expr::Assign(assign) if height == Height::MultiLine && owns_block(&assign.right) => {
+        Expr::Assign(assign)
+            if height == Height::MultiLine
+                && (owns_block(&assign.right) || is_block_closure(&assign.right)) =>
+        {
             Kind::BlockLike
         }
-        _ if owns_block(expr) => Kind::BlockLike,
+        _ if leads_with_block(expr) => Kind::BlockLike,
         _ => Kind::Other,
     }
 }
 
 fn local_kind(local: &Local, height: Height) -> Kind {
     let block_like = local.init.as_ref().is_some_and(|init| {
-        init.diverge.is_some() || owns_block(&init.expr) || is_block_closure(&init.expr)
+        init.diverge.is_some() || leads_with_block(&init.expr) || is_block_closure(&init.expr)
     });
 
     if height == Height::MultiLine && block_like {
         Kind::BlockLike
     } else {
-        Kind::Other
+        Kind::Let
     }
 }
 
@@ -193,6 +245,18 @@ fn item_kind(item: &Item, height: Height) -> Kind {
         Item::Mod(module) if module.content.is_some() => Kind::ItemBlock,
         _ if height == Height::MultiLine => Kind::ItemBlock,
         _ => Kind::Other,
+    }
+}
+
+/// A macro written as a statement. One with a braced body over several lines
+/// (`tokio::select! { .. }`) holds blocks, so it stands apart like one.
+fn statement_macro_kind(invocation: &Macro, height: Height) -> Kind {
+    let braced = matches!(invocation.delimiter, MacroDelimiter::Brace(_));
+
+    if braced && height == Height::MultiLine {
+        Kind::BlockLike
+    } else {
+        macro_kind(invocation)
     }
 }
 

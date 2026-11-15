@@ -69,7 +69,9 @@ impl Fixture {
                     .map(move |rule| (number, rule.to_owned()))
             })
             .collect();
+
         expected.sort();
+
         let path = lines
             .first()
             .and_then(|(code, _)| code.strip_prefix(PATH_DIRECTIVE))
@@ -118,6 +120,7 @@ impl Fixture {
                 .into_iter()
                 .map(|finding| (finding.line, finding.rule.name().to_owned()))
                 .collect();
+
         found.sort();
 
         Ok(found)
@@ -140,11 +143,13 @@ impl Fixture {
             .join(directory)
             .join(case);
         let copy = root.join(&self.path);
+
         fs::create_dir_all(copy.parent().unwrap_or(&root))?;
         fs::write(&copy, &self.text)?;
         fs::write(root.join("empty.yml"), "")?;
 
         let mut command = Command::new("ast-grep");
+
         command
             .current_dir(&root)
             .args(["scan", "--config", "empty.yml", "--format", "github"])
@@ -178,6 +183,7 @@ impl Fixture {
     fn fixed(&self, text: &str) -> Result<String, check::CheckError> {
         let listed = HashSet::new();
         let mut source = self.source(text);
+
         check::settle(&mut source, &self.context(&listed))?;
 
         Ok(source.text())
@@ -199,6 +205,7 @@ fn fixtures() -> io::Result<Vec<Fixture>> {
         .flatten()
         .map(|entry| Ok(entry?.path()))
         .collect::<io::Result<Vec<PathBuf>>>()?;
+
     files.retain(|file| file.to_string_lossy().ends_with(EXTENSION));
     files.sort();
 
@@ -212,6 +219,7 @@ fn every_fixture_reports_exactly_its_marked_lines() {
         .iter()
         .filter_map(|fixture| {
             let mut found = fixture.found().unwrap();
+
             found.extend(fixture.patterns_found().unwrap());
             found.sort();
 

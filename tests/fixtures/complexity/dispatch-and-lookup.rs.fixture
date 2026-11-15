@@ -38,5 +38,6 @@ fn dispatch(command: Command) -> Outcome { //~ complexity
 fn hidden_branches(ready: bool, items: &[u8]) -> Option<u8> { //~ no-boolean-trap
     let first = items.first().copied().filter(|item| *item > 3).map_or(Some(0), |item| (item > 9).then(|| item * 2));
     let second = ready.then(|| items.len() as u8).unwrap_or_else(|| items.iter().copied().find(|item| *item == 1).unwrap_or(7));
+
     first.or(second).and_then(|value| (value != 4).then_some(value)).xor(items.last().copied().filter(|last| *last != 0))
 }

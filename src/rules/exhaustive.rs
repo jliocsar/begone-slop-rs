@@ -142,13 +142,16 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     }
 
     let mut local = LocalEnums::default();
+
     local.visit_file(file.syntax);
+
     let mut exhaustive = Exhaustive {
         tests: &file.tests,
         enums: local.names,
         impl_self: None,
         findings: Vec::new(),
     };
+
     exhaustive.visit_file(file.syntax);
 
     exhaustive.findings

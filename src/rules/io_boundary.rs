@@ -244,6 +244,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         boundary,
         findings: Vec::new(),
     };
+
     io_check.visit_file(file.syntax);
     io_check.findings.dedup_by_key(|finding| finding.line);
 

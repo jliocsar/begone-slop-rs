@@ -2,6 +2,7 @@
 
 fn names_for_each(users: &[User]) -> Vec<String> {
     let mut names = Vec::new();
+
     users.iter().for_each(|user| names.push(user.name.clone()));
 
     names

@@ -87,6 +87,7 @@ impl TestHygiene<'_> {
 impl Body {
     fn of(block: &Block) -> Self {
         let mut body = Self::default();
+
         body.visit_block(block);
 
         body
@@ -106,6 +107,7 @@ impl<'ast> Visit<'ast> for Body {
 
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
         let method = call.method.to_string();
+
         self.asserts |= method.starts_with("assert");
         self.calls.insert(method);
         visit::visit_expr_method_call(self, call);
@@ -246,12 +248,15 @@ fn is_vague(name: &str) -> bool {
 pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let syntax = file.syntax;
     let mut bodies = Bodies::default();
+
     bodies.visit_file(syntax);
+
     let mut hygiene = TestHygiene {
         tests: &file.tests,
         findings: Vec::new(),
         asserting: bodies.asserting(),
     };
+
     hygiene.visit_file(syntax);
 
     hygiene.findings
