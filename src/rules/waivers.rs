@@ -52,6 +52,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         .iter()
         .filter_map(|comment| {
             let body = directive(comment);
+
             let (rule, message) = if body.starts_with(BS_ALLOW) {
                 bs_allow_problem(comment, body)
             } else if body.starts_with(AST_GREP_IGNORE) {

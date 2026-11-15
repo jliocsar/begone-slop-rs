@@ -15,8 +15,12 @@ impl Gap {
         self.after + 1..self.before
     }
 
-    fn has_blank(self, source: &Source) -> bool {
-        self.lines().any(|number| source.is_blank(number))
+    /// Whether the gap opens with a blank line. A comment in the gap introduces what follows
+    /// it, so the blank line that sets the two apart goes above the comment, not below it.
+    fn opens_with_blank(self, source: &Source) -> bool {
+        self.lines()
+            .next()
+            .is_some_and(|number| source.is_blank(number))
     }
 
     /// A comment in the gap introduces what follows it, so a blank line around it is the
@@ -32,7 +36,7 @@ pub(super) fn require_blank(
     rule: Rule,
     reason: &str,
 ) -> Option<Finding> {
-    if gap.after >= gap.before || gap.has_blank(source) {
+    if gap.after >= gap.before || gap.opens_with_blank(source) {
         return None;
     }
 

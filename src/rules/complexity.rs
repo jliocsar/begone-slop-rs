@@ -26,6 +26,7 @@ struct Branches {
 impl Functions {
     fn measure(&mut self, name: &Ident, body: &Block) {
         let mut branches = Branches { count: 1 };
+
         branches.visit_block(body);
 
         if branches.count > MAX_COMPLEXITY {
@@ -110,6 +111,7 @@ impl<'ast> Visit<'ast> for Branches {
             .init
             .as_ref()
             .is_some_and(|init| init.diverge.is_some());
+
         self.count += usize::from(diverges);
         visit::visit_local(self, local);
     }
@@ -144,6 +146,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut functions = Functions {
         findings: Vec::new(),
     };
+
     functions.visit_file(file.syntax);
 
     functions.findings

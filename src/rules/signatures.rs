@@ -193,6 +193,7 @@ impl<'ast> Visit<'ast> for Signatures<'_> {
 
     fn visit_item_impl(&mut self, implementation: &'ast ItemImpl) {
         let outer = (self.in_trait_impl, self.in_id_impl);
+
         self.in_trait_impl = implementation.trait_.is_some();
         self.in_id_impl = matches!(&*implementation.self_ty, Type::Path(path)
             if path.path.segments.last().is_some_and(|segment| segment.ident.to_string().ends_with("Id")));
@@ -308,6 +309,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         in_trait_impl: false,
         in_id_impl: false,
     };
+
     signatures.visit_file(syntax);
 
     signatures.findings

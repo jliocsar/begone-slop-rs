@@ -196,6 +196,7 @@ impl Lexer {
 
     fn line_comment(&mut self) {
         self.at += 2;
+
         let end = (self.at..self.characters.len())
             .find(|index| self.characters.get(*index) == Some(&'\n'))
             .unwrap_or(self.characters.len());
@@ -222,7 +223,9 @@ impl Lexer {
     fn block_comment(&mut self) {
         let line = self.line;
         let after_code = self.line_has_code;
+
         self.at += 2;
+
         let doc = matches!(
             (self.peek(0), self.peek(1)),
             (Some('*'), Some(next)) if next != '*' && next != '/'
@@ -291,6 +294,7 @@ impl Lexer {
     /// `r"..."`, `r#"..."#` and their `b`/`c` forms, from the opening quote.
     fn raw_string(&mut self) {
         let hashes = self.hashes_from(0);
+
         self.at += hashes + 1;
 
         while let Some(character) = self.peek(0) {
@@ -330,6 +334,7 @@ impl Lexer {
     /// string (`b"`, `c"`, `b'x'`).
     fn word(&mut self) {
         self.line_has_code = true;
+
         let start = self.at;
 
         while self
@@ -423,6 +428,7 @@ mod tests {
     #[test]
     fn edits_insert_and_delete_whole_lines() {
         let mut sample = source("one\ntwo\n\nthree\n");
+
         sample.apply(&[Edit::InsertBlankAfter(1), Edit::DeleteLines(vec![3])]);
 
         assert_eq!(sample.text(), "one\n\ntwo\nthree\n");
@@ -431,7 +437,9 @@ mod tests {
     #[test]
     fn comments_move_with_the_lines_an_edit_moves() {
         let mut sample = source("one();\n// note\ntwo();\n");
+
         sample.apply(&[Edit::InsertBlankAfter(1)]);
+
         let lines: Vec<usize> = sample
             .comments()
             .iter()
@@ -444,6 +452,7 @@ mod tests {
     #[test]
     fn crlf_files_keep_their_line_breaks() {
         let mut sample = source("one\r\ntwo\r\n");
+
         sample.apply(&[Edit::InsertBlankAfter(1)]);
 
         assert_eq!(sample.text(), "one\r\n\r\ntwo\r\n");

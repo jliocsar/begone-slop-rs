@@ -164,6 +164,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
                 module,
                 findings: Vec::new(),
             };
+
             layer_check.visit_file(file.syntax);
 
             Some(layer_check.findings)
@@ -195,6 +196,7 @@ mod tests {
             findings: Vec::new(),
         };
         let file = syn::parse_file(text).unwrap();
+
         syn::visit::Visit::visit_file(&mut layer_check, &file);
 
         layer_check

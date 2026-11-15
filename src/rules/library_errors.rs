@@ -68,6 +68,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         file,
         findings: Vec::new(),
     };
+
     errors.visit_file(file.syntax);
     errors.findings.dedup_by_key(|finding| finding.line);
 

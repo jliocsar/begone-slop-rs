@@ -220,19 +220,35 @@ and a file reached through `#[cfg(test)] mod x;` (with or without `#[path]`). Th
 from walking each crate's module tree from its targets before the rules run, which also tells
 a binary's modules from a library's.
 
-`padding` is begone-slop's `padding-line-between-statements` preset, read for Rust:
+`padding` is begone-slop's `padding-line-between-statements` preset, read for Rust. Between two
+neighbouring statements in a block (or items in a file, `impl`, trait or module), the first rule
+that fits decides:
 
-- a blank line before a `return`
-- a blank line around anything that owns a block: `if`, `match`, loops, a multi-line `let` bound to
-  one of those, `let ... else`, and a closure with a block body
-- a blank line around functions, `impl`s, traits, inline modules and other multi-line items
-- a blank line after the imports, with any spacing between them
-- one-line `const`/`static` items of the same visibility grouped with no blank line inside the
+- one-line `const`/`static` items of the same visibility group with no blank line inside the
   group, and a blank line around it
-- one-line `let`s may sit together
+- a blank line after the imports, with any spacing between them
+- a blank line before a `return`, and before the block's value: its last expression, with no `;`
+  (the `return` Rust leaves unwritten)
+- a blank line around anything that owns a block: `if`/`if let` (with its whole `else if` chain),
+  `match`, `for`, `while`/`while let`, `loop`, `unsafe`, `async` and labeled blocks, one with a
+  call or `.await` hung off its end (`match mode { .. }.run();`), a multi-line `let` bound to one
+  of those or to a closure with a block body, a multi-line `let ... else`, a multi-line macro with
+  a braced body (`tokio::select! { .. }`), and functions, `impl`s, traits, inline modules and
+  other multi-line items
+- a blank line around a run of `let`s; inside the run, `let`s may sit together
+- an assertion and what sits around it are `assert-padding`'s call
+- anything else (two calls, say) may sit together
 
-A comment in the gap counts as introducing what follows it. So a blank line above a comment is
-never removed, and a missing one is added above the comment, not between it and its code.
+The first statement after `{` and the last before `}` need no blank line, and nothing is checked
+between two statements on one line (`{ let left = 1; left + 1 }`) or between match arms.
+`syn` leaves macro arguments as tokens, so `padding` also reads every braced group inside them
+that parses as a block: `tokio::select!` arms and closures passed to `assert!`. A `macro_rules!`
+body is a template, so it's left alone.
+
+A comment in the gap counts as introducing what follows it, and so does an attribute or doc
+comment, which belongs to its statement. So the blank line goes above the comment: a blank line
+between the comment and its code doesn't count, a blank line above a comment is never removed,
+and a missing one is added above the comment.
 
 `assert-padding` is `expect-padding`. It applies inside `#[test]` functions, `#[cfg(test)]` modules
 and `tests/`. It covers `assert!`, `assert_eq!`, `assert_ne!`, `assert_matches!` and their

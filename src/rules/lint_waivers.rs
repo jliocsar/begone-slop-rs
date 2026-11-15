@@ -266,6 +266,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         tests: &file.tests,
         findings: Vec::new(),
     };
+
     waivers.visit_file(file.syntax);
 
     waivers.findings

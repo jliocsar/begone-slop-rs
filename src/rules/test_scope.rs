@@ -43,6 +43,7 @@ impl<'ast> Visit<'ast> for TestLines {
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
         if is_test_fn(&function.attrs) {
             let last = function.block.brace_token.span.close().end().line;
+
             self.ranges.push(function.span().start().line..=last);
         } else {
             visit::visit_item_fn(self, function);

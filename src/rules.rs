@@ -298,6 +298,7 @@ pub fn run(file: &FileContext) -> Vec<Finding> {
         .iter()
         .flat_map(|check| check(file))
         .partition(|finding| file.waivers.iter().any(|waiver| waiver.waives(finding)));
+
     findings.extend(waivers::unused(&file.waivers, &waived));
     findings.sort_by_key(|finding| finding.line);
 
@@ -358,6 +359,7 @@ pub(crate) mod testing {
             .into_iter()
             .filter_map(|finding| finding.edit)
             .collect();
+
         source.apply(&edits);
 
         source.text()
@@ -427,8 +429,10 @@ mod tests {
             .filter(|info| info.group == Group::Syntax)
             .map(|info| (info.name, info.fixable))
             .collect();
+
         table.sort_unstable();
         syntax.sort_unstable();
+
         let unlisted: Vec<&str> = RULES
             .iter()
             .filter(|info| info.group != Group::Syntax)

@@ -80,6 +80,7 @@ impl Names {
             .filter_map(|field| field.ident.as_ref())
             .map(|ident| (ident.to_string(), ident.span().start().line))
             .collect();
+
         self.numbered(&names);
 
         for (name, line) in &names {
@@ -172,6 +173,7 @@ impl<'ast> Visit<'ast> for Names {
 
     fn visit_item_impl(&mut self, implementation: &'ast ItemImpl) {
         let outer = self.in_trait_impl;
+
         self.in_trait_impl = implementation.trait_.is_some();
         visit::visit_item_impl(self, implementation);
         self.in_trait_impl = outer;
@@ -213,6 +215,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         findings: Vec::new(),
         in_trait_impl: false,
     };
+
     names.visit_file(file.syntax);
 
     names.findings

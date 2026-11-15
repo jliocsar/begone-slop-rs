@@ -196,6 +196,7 @@ impl Config {
     /// Fails when the text isn't a valid `bs.toml`.
     pub fn parse(text: &str, root: PathBuf) -> Result<Self, toml::de::Error> {
         let mut config: Self = toml::from_str(text)?;
+
         config.root = root;
         config.normalize();
 

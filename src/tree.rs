@@ -64,6 +64,7 @@ impl Walk {
             inline: Vec::new(),
             role,
         };
+
         self.items(&position, &parsed.items);
     }
 
@@ -87,6 +88,7 @@ impl Walk {
 
         if let Some((_, items)) = &module.content {
             let mut nested = position.clone();
+
             nested.inline.push(name);
             nested.role = role;
             self.items(&nested, items);
@@ -110,6 +112,7 @@ impl Walk {
             .find(|candidate| candidate.is_file())
         {
             let child_children = children_directory(&child, FileKind::Module);
+
             self.visit(&child, &child_children, role);
         }
     }
@@ -128,6 +131,7 @@ pub fn crate_root(file: &Path) -> Option<&Path> {
 #[must_use]
 pub fn roles(files: &[PathBuf]) -> HashMap<PathBuf, Role> {
     let mut crates: Vec<&Path> = files.iter().filter_map(|file| crate_root(file)).collect();
+
     crates.sort();
     crates.dedup();
 
@@ -136,6 +140,7 @@ pub fn roles(files: &[PathBuf]) -> HashMap<PathBuf, Role> {
     for root in crates {
         for (file, role) in targets(root) {
             let children = children_directory(&file, FileKind::TargetRoot);
+
             walk.visit(&file, &children, role);
         }
     }

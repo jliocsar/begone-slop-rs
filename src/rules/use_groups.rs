@@ -141,7 +141,9 @@ impl UseGroups<'_> {
                 })
         });
         let mut sorted = imports.to_vec();
+
         sorted.sort_by_key(|import| import.group);
+
         let mut lines: Vec<String> = Vec::new();
 
         for (index, import) in sorted.iter().enumerate() {
@@ -193,6 +195,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         source: file.source,
         findings: Vec::new(),
     };
+
     groups.visit_file(file.syntax);
 
     groups.findings

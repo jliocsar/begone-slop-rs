@@ -54,9 +54,11 @@ struct Tests {
 impl TestBody {
     fn of(function: &ItemFn) -> Vec<Finding> {
         let mut body = Self::default();
+
         body.visit_block(&function.block);
 
         let skippable = std::mem::take(&mut body.skippable);
+
         body.findings.extend(skippable.into_iter().map(|line| Finding {
             line,
             rule: Rule::TestConditionalAssert,
@@ -69,6 +71,7 @@ impl TestBody {
 
     fn branch(&mut self, conditional: Option<usize>, walk: impl FnOnce(&mut Self)) {
         let outer = self.conditional;
+
         self.conditional = outer.or(conditional);
         self.branch_depth += 1;
         walk(self);
@@ -82,6 +85,7 @@ impl<'ast> Visit<'ast> for TestBody {
 
     fn visit_expr_if(&mut self, branch: &'ast ExprIf) {
         self.visit_expr(&branch.cond);
+
         let may_skip = matches!(&*branch.cond, Expr::Let(_)) && branch.else_branch.is_none();
         let line = may_skip.then(|| branch.if_token.span.start().line);
 
@@ -94,6 +98,7 @@ impl<'ast> Visit<'ast> for TestBody {
 
     fn visit_expr_match(&mut self, matching: &'ast ExprMatch) {
         self.visit_expr(&matching.expr);
+
         let skips = matching.arms.iter().any(is_skipping_arm);
         let line = skips.then(|| matching.match_token.span.start().line);
 
@@ -291,7 +296,9 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     let mut tests = Tests {
         findings: Vec::new(),
     };
+
     tests.visit_file(file.syntax);
+
     let mut findings = tests.findings;
 
     if matches!(file.role, Role::Library | Role::Binary) {
@@ -299,6 +306,7 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
             findings: Vec::new(),
             fn_depth: 0,
         };
+
         production.visit_file(file.syntax);
         findings.extend(production.findings);
     }
