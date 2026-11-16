@@ -1,2 +1,4 @@
 use_field_init_shorthand = true
 use_try_shorthand = true
+# One call per line once a chain is longer than this (rustfmt default: 60).
+chain_width = 40

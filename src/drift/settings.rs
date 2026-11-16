@@ -196,9 +196,14 @@ impl Setting<'_> {
             self.direction,
             Direction::LooseWhenTrue(true) | Direction::StrictWhenTrue(true)
         );
-        let wanted = self.preset.map_or(Some(default), Value::as_bool)?;
+        let wanted = self
+            .preset
+            .map_or(Some(default), Value::as_bool)?;
 
-        let Some(have) = self.project.map_or(Some(default), Value::as_bool) else {
+        let Some(have) = self
+            .project
+            .map_or(Some(default), Value::as_bool)
+        else {
             return Some(self.unreadable());
         };
 
@@ -277,7 +282,10 @@ impl Setting<'_> {
 
 /// The settings in `project` that are looser than the same settings in `preset`.
 pub(super) fn loosened(preset: &Table, project: &Table) -> Vec<Loosened> {
-    let mut keys: Vec<&String> = preset.keys().chain(project.keys()).collect();
+    let mut keys: Vec<&String> = preset
+        .keys()
+        .chain(project.keys())
+        .collect();
 
     keys.sort();
     keys.dedup();
@@ -317,7 +325,12 @@ fn direction(key: &str) -> Direction {
 
 /// Lists and switches, placed by their names.
 fn direction_by_name(key: &str) -> Direction {
-    let starts = |prefixes: &[&str]| prefixes.iter().any(|prefix| key.starts_with(prefix));
+    let starts = |prefixes: &[&str]| {
+        prefixes
+            .iter()
+            .any(|prefix| key.starts_with(prefix))
+    };
+
     let named = |names: &[&str]| names.contains(&key);
 
     if named(&EXACT) {

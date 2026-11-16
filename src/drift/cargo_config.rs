@@ -81,12 +81,20 @@ impl LintOption {
 
 impl Variable {
     fn parse(name: &str, value: &str) -> Option<Self> {
-        let spaced = || value.split_whitespace().map(str::to_owned).collect();
+        let spaced = || {
+            value
+                .split_whitespace()
+                .map(str::to_owned)
+                .collect()
+        };
 
         match name {
             "CLIPPY_CONF_DIR" => Some(Self::ClippyConfig),
             "CARGO_ENCODED_RUSTFLAGS" => Some(Self::Flags(
-                value.split('\u{1f}').map(str::to_owned).collect(),
+                value
+                    .split('\u{1f}')
+                    .map(str::to_owned)
+                    .collect(),
             )),
             "RUSTFLAGS" => Some(Self::Flags(spaced())),
             _ if name.starts_with("CARGO_") && name.ends_with("_RUSTFLAGS") => {
@@ -101,7 +109,9 @@ impl Variable {
 /// which decides whether a `-W` lowers anything.
 pub(super) fn config_bypasses(config: &Table, preset: &[Entry]) -> Vec<Bypass> {
     let mut found = Vec::new();
-    let build = config.get("build").and_then(Value::as_table);
+    let build = config
+        .get("build")
+        .and_then(Value::as_table);
     let host = config.get("host");
     let flag_lists = build
         .and_then(|build| build.get("rustflags"))
@@ -187,7 +197,10 @@ fn is_gate_variable(variable: &str) -> bool {
 /// `rustflags` as a string of words or an array of them.
 fn words(value: &Value) -> Vec<String> {
     match value {
-        Value::String(text) => text.split_whitespace().map(str::to_owned).collect(),
+        Value::String(text) => text
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect(),
         Value::Array(items) => items
             .iter()
             .filter_map(Value::as_str)
@@ -280,7 +293,9 @@ fn runs_in_tree_binary(words: &[String]) -> bool {
         .chain(after.iter().map(String::as_str))
         .collect();
 
-    BOOTSTRAP_FORMS.iter().any(|form| kept == *form)
+    BOOTSTRAP_FORMS
+        .iter()
+        .any(|form| kept == *form)
 }
 
 #[cfg(test)]

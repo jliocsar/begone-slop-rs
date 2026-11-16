@@ -17,7 +17,11 @@ struct AssertPadding<'run> {
 
 impl AssertPadding<'_> {
     fn sequence(&mut self, block: &Block) {
-        let units: Vec<Unit> = block.stmts.iter().map(Unit::of_stmt).collect();
+        let units: Vec<Unit> = block
+            .stmts
+            .iter()
+            .map(Unit::of_stmt)
+            .collect();
 
         for pair in units.windows(2) {
             let [previous, next] = pair else {
@@ -53,10 +57,14 @@ impl AssertPadding<'_> {
 
 impl<'ast> Visit<'ast> for AssertPadding<'_> {
     fn visit_block(&mut self, block: &'ast Block) {
-        if self
-            .file
-            .is_test(block.brace_token.span.open().start().line)
-        {
+        if self.file.is_test(
+            block
+                .brace_token
+                .span
+                .open()
+                .start()
+                .line,
+        ) {
             self.sequence(block);
         }
 

@@ -177,7 +177,11 @@ impl<'ast> Visit<'ast> for LintWaivers<'_> {
             self.check_attribute(attribute, Placement::Module);
         }
 
-        for item in module.content.iter().flat_map(|(_, items)| items) {
+        for item in module
+            .content
+            .iter()
+            .flat_map(|(_, items)| items)
+        {
             self.visit_item(item);
         }
     }
@@ -203,7 +207,9 @@ fn is_forbidden(lint: &str) -> bool {
 }
 
 fn is_level(list: &MetaList) -> bool {
-    LEVELS.iter().any(|level| list.path.is_ident(level))
+    LEVELS
+        .iter()
+        .any(|level| list.path.is_ident(level))
 }
 
 fn arguments(list: &MetaList) -> Vec<Meta> {

@@ -69,10 +69,13 @@ impl Walk {
     }
 
     fn items(&mut self, position: &Position, items: &[Item]) {
-        for module in items.iter().filter_map(|item| match item {
-            Item::Mod(module) => Some(module),
-            _ => None,
-        }) {
+        for module in items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Mod(module) => Some(module),
+                _ => None,
+            })
+        {
             self.module(position, module);
         }
     }
@@ -98,7 +101,10 @@ impl Walk {
 
         if let Some(value) = path_attribute(&module.attrs) {
             let target = path_target(&position.file, &position.children, &position.inline, &value);
-            let target_children = target.parent().unwrap_or_else(|| Path::new("")).to_owned();
+            let target_children = target
+                .parent()
+                .unwrap_or_else(|| Path::new(""))
+                .to_owned();
 
             if target.is_file() {
                 self.visit(&target, &target_children, role);
@@ -130,7 +136,10 @@ pub fn crate_root(file: &Path) -> Option<&Path> {
 /// two kinds of code gets the stricter one.
 #[must_use]
 pub fn roles(files: &[PathBuf]) -> HashMap<PathBuf, Role> {
-    let mut crates: Vec<&Path> = files.iter().filter_map(|file| crate_root(file)).collect();
+    let mut crates: Vec<&Path> = files
+        .iter()
+        .filter_map(|file| crate_root(file))
+        .collect();
 
     crates.sort();
     crates.dedup();

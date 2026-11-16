@@ -99,7 +99,10 @@ impl<'ast> Visit<'ast> for TestBody {
     fn visit_expr_match(&mut self, matching: &'ast ExprMatch) {
         self.visit_expr(&matching.expr);
 
-        let skips = matching.arms.iter().any(is_skipping_arm);
+        let skips = matching
+            .arms
+            .iter()
+            .any(is_skipping_arm);
         let line = skips.then(|| matching.match_token.span.start().line);
 
         for arm in &matching.arms {
@@ -108,7 +111,10 @@ impl<'ast> Visit<'ast> for TestBody {
     }
 
     fn visit_expr_return(&mut self, stop: &'ast ExprReturn) {
-        let passes = stop.expr.as_deref().is_none_or(is_unit_ok);
+        let passes = stop
+            .expr
+            .as_deref()
+            .is_none_or(is_unit_ok);
 
         if self.branch_depth > 0 && passes {
             self.findings.push(Finding {
@@ -169,7 +175,9 @@ impl Production {
 
     fn name(&mut self, ident: &Ident) {
         let name = ident.to_string();
-        let for_tests = TEST_SUFFIXES.iter().any(|suffix| name.ends_with(suffix))
+        let for_tests = TEST_SUFFIXES
+            .iter()
+            .any(|suffix| name.ends_with(suffix))
             || name.starts_with(TEST_PREFIX);
 
         if for_tests {
@@ -252,7 +260,8 @@ impl<'ast> Visit<'ast> for Production {
 impl<'ast> Visit<'ast> for Tests {
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
         if is_test_fn(&function.attrs) {
-            self.findings.extend(TestBody::of(function));
+            self.findings
+                .extend(TestBody::of(function));
         }
 
         visit::visit_item_fn(self, function);
@@ -261,11 +270,13 @@ impl<'ast> Visit<'ast> for Tests {
 
 /// Whether a `cfg` predicate names `test` anywhere: `test`, `any(test, feature = "x")`.
 fn mentions_test(tokens: TokenStream) -> bool {
-    tokens.into_iter().any(|token| match token {
-        TokenTree::Ident(ident) => ident == "test",
-        TokenTree::Group(group) => mentions_test(group.stream()),
-        TokenTree::Punct(_) | TokenTree::Literal(_) => false,
-    })
+    tokens
+        .into_iter()
+        .any(|token| match token {
+            TokenTree::Ident(ident) => ident == "test",
+            TokenTree::Group(group) => mentions_test(group.stream()),
+            TokenTree::Punct(_) | TokenTree::Literal(_) => false,
+        })
 }
 
 /// `_ => {}`, `_ => ()`, `Err(_) => {}`, `None => {}`: an arm where the rest is skipped.

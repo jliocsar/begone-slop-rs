@@ -63,12 +63,17 @@ impl TestHygiene<'_> {
     }
 
     fn require_assertion(&mut self, function: &ItemFn) {
-        let should_panic = function
-            .attrs
-            .iter()
-            .any(|attribute| attribute.path().is_ident("should_panic"));
+        let should_panic = function.attrs.iter().any(|attribute| {
+            attribute
+                .path()
+                .is_ident("should_panic")
+        });
         let body = Body::of(&function.block);
-        let asserts = body.asserts || body.calls.iter().any(|name| self.asserting.contains(name));
+        let asserts = body.asserts
+            || body
+                .calls
+                .iter()
+                .any(|name| self.asserting.contains(name));
 
         if !should_panic && !asserts {
             self.findings.push(Finding {
@@ -99,7 +104,8 @@ impl<'ast> Visit<'ast> for Body {
         if let Expr::Path(callee) = &*call.func
             && let Some(last) = callee.path.segments.last()
         {
-            self.calls.insert(last.ident.to_string());
+            self.calls
+                .insert(last.ident.to_string());
         }
 
         visit::visit_expr_call(self, call);
@@ -145,7 +151,10 @@ impl Bodies {
                 .iter()
                 .filter(|(name, body)| {
                     !asserting.contains(*name)
-                        && body.calls.iter().any(|call| asserting.contains(call))
+                        && body
+                            .calls
+                            .iter()
+                            .any(|call| asserting.contains(call))
                 })
                 .map(|(name, _)| name.clone())
                 .collect();
@@ -242,7 +251,10 @@ fn is_vague(name: &str) -> bool {
         || bare.ends_with("_test")
         || bare
             .strip_prefix("test")
-            .is_some_and(|rest| rest.chars().all(|character| character.is_ascii_digit()))
+            .is_some_and(|rest| {
+                rest.chars()
+                    .all(|character| character.is_ascii_digit())
+            })
 }
 
 pub(super) fn check(file: &FileContext) -> Vec<Finding> {

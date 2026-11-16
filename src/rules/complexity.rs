@@ -90,7 +90,11 @@ impl<'ast> Visit<'ast> for Branches {
             .iter()
             .filter(|arm| arm.guard.is_some())
             .count();
-        let lookup = guards == 0 && matching.arms.iter().all(|arm| is_value(&arm.body));
+        let lookup = guards == 0
+            && matching
+                .arms
+                .iter()
+                .all(|arm| is_value(&arm.body));
 
         if !lookup {
             self.count += matching.arms.len().saturating_sub(1) + guards;
@@ -134,12 +138,15 @@ fn is_constructor(callee: &Expr) -> bool {
         return false;
     };
 
-    path.path.segments.last().is_some_and(|segment| {
-        segment
-            .ident
-            .to_string()
-            .starts_with(|first: char| first.is_uppercase())
-    })
+    path.path
+        .segments
+        .last()
+        .is_some_and(|segment| {
+            segment
+                .ident
+                .to_string()
+                .starts_with(|first: char| first.is_uppercase())
+        })
 }
 
 pub(super) fn check(file: &FileContext) -> Vec<Finding> {

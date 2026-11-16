@@ -93,7 +93,11 @@ impl<'file> Aliases<'file> {
 
 impl Signatures<'_> {
     fn signature(&mut self, signature: &Signature) {
-        if self.tests.contains(signature.fn_token.span.start().line) || self.in_trait_impl {
+        if self
+            .tests
+            .contains(signature.fn_token.span.start().line)
+            || self.in_trait_impl
+        {
             return;
         }
 
@@ -116,9 +120,12 @@ impl Signatures<'_> {
                 );
             }
 
-            let parses = PARSE_PREFIXES
-                .iter()
-                .any(|prefix| signature.ident.to_string().starts_with(prefix));
+            let parses = PARSE_PREFIXES.iter().any(|prefix| {
+                signature
+                    .ident
+                    .to_string()
+                    .starts_with(prefix)
+            });
 
             if !parses {
                 self.category(&name, &typed.ty, binding.ident.span().start().line);
@@ -172,7 +179,9 @@ impl Signatures<'_> {
 impl<'ast> Visit<'ast> for Signatures<'_> {
     fn visit_field(&mut self, field: &'ast Field) {
         if let Some(ident) = &field.ident
-            && !self.tests.contains(ident.span().start().line)
+            && !self
+                .tests
+                .contains(ident.span().start().line)
         {
             self.id(&ident.to_string(), &field.ty, ident.span().start().line);
             self.category(&ident.to_string(), &field.ty, ident.span().start().line);
@@ -243,10 +252,16 @@ fn is_string(ty: &Type, aliases: &Aliases) -> bool {
 
     match ty {
         Type::Reference(reference) => is_string(&reference.elem, aliases),
-        Type::Path(path) => path.path.segments.last().is_some_and(|segment| {
-            STRING_TYPES.iter().any(|name| segment.ident == name)
-                || wraps_str(&segment.arguments, aliases)
-        }),
+        Type::Path(path) => path
+            .path
+            .segments
+            .last()
+            .is_some_and(|segment| {
+                STRING_TYPES
+                    .iter()
+                    .any(|name| segment.ident == name)
+                    || wraps_str(&segment.arguments, aliases)
+            }),
         _ => false,
     }
 }
@@ -259,10 +274,16 @@ fn is_raw_id(ty: &Type, aliases: &Aliases) -> bool {
 
     match ty {
         Type::Reference(reference) => is_raw_id(&reference.elem, aliases),
-        Type::Path(path) => path.path.segments.last().is_some_and(|segment| {
-            RAW_ID_TYPES.iter().any(|raw| segment.ident == raw)
-                && (segment.arguments.is_empty() || wraps_str(&segment.arguments, aliases))
-        }),
+        Type::Path(path) => path
+            .path
+            .segments
+            .last()
+            .is_some_and(|segment| {
+                RAW_ID_TYPES
+                    .iter()
+                    .any(|raw| segment.ident == raw)
+                    && (segment.arguments.is_empty() || wraps_str(&segment.arguments, aliases))
+            }),
         _ => false,
     }
 }
@@ -287,10 +308,13 @@ fn collected<'ty>(ty: &'ty Type, aliases: &Aliases<'ty>) -> Option<&'ty Type> {
                 .iter()
                 .any(|collection| segment.ident == collection)
                 .then(|| {
-                    arguments.args.iter().find_map(|argument| match argument {
-                        GenericArgument::Type(inner) => Some(inner),
-                        _ => None,
-                    })
+                    arguments
+                        .args
+                        .iter()
+                        .find_map(|argument| match argument {
+                            GenericArgument::Type(inner) => Some(inner),
+                            _ => None,
+                        })
                 })
                 .flatten()
         }

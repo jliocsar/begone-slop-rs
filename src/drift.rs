@@ -119,11 +119,17 @@ impl Document {
     /// The first line that sets `key` (`key =`, `key=` or `"key" =`), else the header line.
     fn line_of(&self, key: &str, header: &str) -> usize {
         let sets_key = |line: &str| {
-            let trimmed = line.trim_start().trim_start_matches('"');
+            let trimmed = line
+                .trim_start()
+                .trim_start_matches('"');
 
             trimmed
                 .strip_prefix(key)
-                .is_some_and(|rest| rest.trim_start_matches('"').trim_start().starts_with('='))
+                .is_some_and(|rest| {
+                    rest.trim_start_matches('"')
+                        .trim_start()
+                        .starts_with('=')
+                })
         };
 
         self.text
@@ -194,7 +200,9 @@ fn manifests(root: &Path, preset_entries: &[Entry]) -> Vec<Drift> {
         Err(drift) => return vec![drift],
     };
 
-    let workspace = manifest.table_at(&["workspace"]).is_some();
+    let workspace = manifest
+        .table_at(&["workspace"])
+        .is_some();
 
     let (lints_at, header): (&[&str], &str) = if workspace {
         (&["workspace", "lints"], "[workspace.lints")
@@ -203,7 +211,9 @@ fn manifests(root: &Path, preset_entries: &[Entry]) -> Vec<Drift> {
     };
 
     let empty = Table::new();
-    let project = manifest.table_at(lints_at).unwrap_or(&empty);
+    let project = manifest
+        .table_at(lints_at)
+        .unwrap_or(&empty);
     let mut drifts = lint_levels(&manifest, project, header, preset_entries);
 
     if workspace {
@@ -225,7 +235,11 @@ fn lint_levels(
     let mut drifts = entry_problems(manifest, &entries, &unreadable, header, preset_entries);
 
     for (culprit, lowered) in turned_down(&entries, preset_entries) {
-        let entry = culprit.and_then(|name| entries.iter().find(|entry| entry.name == name));
+        let entry = culprit.and_then(|name| {
+            entries
+                .iter()
+                .find(|entry| entry.name == name)
+        });
         let line = entry.map_or_else(
             || manifest.line_of(header, header),
             |entry| line_of_entry(manifest, entry, header),
@@ -254,7 +268,10 @@ fn entry_problems(
         })
         .collect();
 
-    for entry in entries.iter().filter(|entry| entry.level == Level::Allow) {
+    for entry in entries
+        .iter()
+        .filter(|entry| entry.level == Level::Allow)
+    {
         let message = if entry.name == lints::WARNINGS {
             format!(
                 "`{}` = \"allow\" silences every warning, the preset's lints included",
@@ -262,7 +279,9 @@ fn entry_problems(
             )
         } else if lints::default_level(&entry.name).is_none()
             && !lints::is_group(&entry.name)
-            && lints::resolve(preset_entries, &entry.name).level.is_none()
+            && lints::resolve(preset_entries, &entry.name)
+                .level
+                .is_none()
         {
             format!(
                 "`cargo bs` doesn't know the lint `{}`, so it can't tell whether allowing it loosens the preset; remove it, or use its current name",
@@ -301,14 +320,20 @@ fn turned_down<'table>(
 
     let mut turned_down: BTreeMap<Option<&str>, Vec<Lowered>> = BTreeMap::new();
 
-    for name in names.into_iter().filter(|name| !lints::is_group(name)) {
+    for name in names
+        .into_iter()
+        .filter(|name| !lints::is_group(name))
+    {
         let Some(wanted) = lints::resolve(preset_entries, name).level else {
             continue;
         };
 
         let have = lints::resolve(entries, name);
 
-        if have.level.is_none_or(|level| level < wanted) {
+        if have
+            .level
+            .is_none_or(|level| level < wanted)
+        {
             turned_down
                 .entry(have.by.map(|entry| entry.name.as_str()))
                 .or_default()
@@ -356,7 +381,11 @@ fn lowered_message(entry: Option<&Entry>, lowered: &[Lowered]) -> String {
 }
 
 fn line_of_entry(manifest: &Document, entry: &Entry, header: &str) -> usize {
-    let key = entry.name.rsplit("::").next().unwrap_or(&entry.name);
+    let key = entry
+        .name
+        .rsplit("::")
+        .next()
+        .unwrap_or(&entry.name);
 
     manifest.line_of(key, header)
 }
@@ -476,13 +505,21 @@ fn clippy_configs(root: &Path, preset: &Table) -> Vec<Drift> {
 fn cargo_configs(root: &Path, preset_entries: &[Entry]) -> Vec<Drift> {
     let mut paths: Vec<PathBuf> = root
         .ancestors()
-        .flat_map(|directory| CARGO_CONFIGS.iter().map(move |name| directory.join(name)))
+        .flat_map(|directory| {
+            CARGO_CONFIGS
+                .iter()
+                .map(move |name| directory.join(name))
+        })
         .collect();
 
     if let Some(home) = std::env::var_os("CARGO_HOME") {
         let home = PathBuf::from(home);
 
-        paths.extend(["config.toml", "config"].iter().map(|name| home.join(name)));
+        paths.extend(
+            ["config.toml", "config"]
+                .iter()
+                .map(|name| home.join(name)),
+        );
     }
 
     paths.dedup();
@@ -563,7 +600,11 @@ mod tests {
         );
 
         assert_eq!(found.len(), 1);
-        assert!(found.iter().all(|message| message.contains("unwrap_used")));
+        assert!(
+            found
+                .iter()
+                .all(|message| message.contains("unwrap_used"))
+        );
     }
 
     #[test]
@@ -629,7 +670,11 @@ mod tests {
         );
 
         assert_eq!(found.len(), 1);
-        assert!(found.iter().all(|message| message.contains("inherit")));
+        assert!(
+            found
+                .iter()
+                .all(|message| message.contains("inherit"))
+        );
     }
 
     #[test]

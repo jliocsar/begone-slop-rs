@@ -23,7 +23,11 @@ impl<'ast> Visit<'ast> for Exits {
     fn visit_expr_closure(&mut self, _: &'ast ExprClosure) {}
 
     fn visit_expr_return(&mut self, exit: &'ast ExprReturn) {
-        if !exit.expr.as_deref().is_some_and(is_ok_unit) {
+        if !exit
+            .expr
+            .as_deref()
+            .is_some_and(is_ok_unit)
+        {
             self.fallible = true;
         }
 

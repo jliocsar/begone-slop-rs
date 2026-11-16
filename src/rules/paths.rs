@@ -58,7 +58,9 @@ impl Imports {
 
     /// The full path `name` was imported as, if a `use` brought it in.
     pub(super) fn get(&self, name: &str) -> Option<&[String]> {
-        self.by_name.get(name).map(Vec::as_slice)
+        self.by_name
+            .get(name)
+            .map(Vec::as_slice)
     }
 
     pub(super) fn contains(&self, name: &str) -> bool {
@@ -86,7 +88,8 @@ impl Imports {
 
 /// Whether `full` names one of the [`PURE`] values.
 pub(super) fn is_pure(full: &[String]) -> bool {
-    PURE.iter().any(|prefix| starts_with(full, prefix))
+    PURE.iter()
+        .any(|prefix| starts_with(full, prefix))
 }
 
 /// A macro's arguments, when they read as comma-separated expressions (`format!`, `println!`,
@@ -118,7 +121,11 @@ pub(super) fn use_leaves(tree: &UseTree) -> Vec<UseLeaf> {
 pub(super) fn starts_with(full: &[String], prefix: &str) -> bool {
     let wanted: Vec<&str> = prefix.split("::").collect();
 
-    full.len() >= wanted.len() && full.iter().zip(&wanted).all(|(have, want)| have == want)
+    full.len() >= wanted.len()
+        && full
+            .iter()
+            .zip(&wanted)
+            .all(|(have, want)| have == want)
 }
 
 fn collect(tree: &UseTree, prefix: &[String], leaves: &mut Vec<UseLeaf>) {
@@ -170,9 +177,14 @@ mod tests {
 
     fn resolved(imports: &str, written: &str) -> String {
         let file = syn::parse_file(imports).unwrap();
-        let written: Vec<String> = written.split("::").map(str::to_owned).collect();
+        let written: Vec<String> = written
+            .split("::")
+            .map(str::to_owned)
+            .collect();
 
-        Imports::of(&file).resolve(&written).join("::")
+        Imports::of(&file)
+            .resolve(&written)
+            .join("::")
     }
 
     #[test]

@@ -105,7 +105,8 @@ impl UseGroups<'_> {
         let in_order = imports.is_sorted_by_key(|import| import.group);
 
         if !in_order {
-            self.findings.extend(self.regroup(imports));
+            self.findings
+                .extend(self.regroup(imports));
 
             return;
         }
@@ -156,10 +157,11 @@ impl UseGroups<'_> {
                 lines.push(String::new());
             }
 
-            lines.extend(
-                (import.start..=import.end)
-                    .filter_map(|number| self.source.line(number).map(str::to_owned)),
-            );
+            lines.extend((import.start..=import.end).filter_map(|number| {
+                self.source
+                    .line(number)
+                    .map(str::to_owned)
+            }));
         }
 
         Some(Finding {

@@ -78,21 +78,25 @@ fn empty_accumulator(local: &Local) -> Option<String> {
 }
 
 fn only_grows(body: &Block, name: &str) -> bool {
-    body.stmts.iter().all(|stmt| match stmt {
-        Stmt::Local(local) => local
-            .init
-            .as_ref()
-            .is_some_and(|init| init.diverge.is_none() && is_plain(&init.expr)),
-        Stmt::Expr(expr, _) => grows(expr, name),
-        Stmt::Item(_) | Stmt::Macro(_) => false,
-    })
+    body.stmts
+        .iter()
+        .all(|stmt| match stmt {
+            Stmt::Local(local) => local
+                .init
+                .as_ref()
+                .is_some_and(|init| init.diverge.is_none() && is_plain(&init.expr)),
+            Stmt::Expr(expr, _) => grows(expr, name),
+            Stmt::Item(_) | Stmt::Macro(_) => false,
+        })
 }
 
 fn grows(expr: &Expr, name: &str) -> bool {
     match expr {
         Expr::MethodCall(call) => {
             is_named(&call.receiver, name)
-                && GROWING_METHODS.iter().any(|method| call.method == method)
+                && GROWING_METHODS
+                    .iter()
+                    .any(|method| call.method == method)
                 && call.args.iter().all(is_plain)
         }
         Expr::Binary(binary) => {

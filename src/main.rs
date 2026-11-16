@@ -93,7 +93,10 @@ fn main() -> ExitCode {
     // Cargo runs `cargo-bs bs <args>`; run directly, there's no `bs`.
     let mut arguments: Vec<String> = std::env::args().skip(1).collect();
 
-    if arguments.first().is_some_and(|first| first == "bs") {
+    if arguments
+        .first()
+        .is_some_and(|first| first == "bs")
+    {
         arguments.remove(0);
     }
 
@@ -153,7 +156,9 @@ fn parse(arguments: &[String]) -> Result<Command, Usage> {
         }
     }
 
-    options.paths.extend(paths.iter().map(PathBuf::from));
+    options
+        .paths
+        .extend(paths.iter().map(PathBuf::from));
 
     if options.paths.is_empty() {
         options.paths.push(".".into());
@@ -167,15 +172,26 @@ fn parse(arguments: &[String]) -> Result<Command, Usage> {
 fn parse_init(arguments: &[String]) -> Result<Command, Usage> {
     let (flags, after) = split_options(arguments);
 
-    if flags.iter().any(|flag| HELP_FLAGS.contains(&flag.as_str())) {
+    if flags
+        .iter()
+        .any(|flag| HELP_FLAGS.contains(&flag.as_str()))
+    {
         return Ok(Command::InitHelp);
     }
 
-    if let Some(flag) = flags.iter().find(|flag| flag.starts_with('-')) {
+    if let Some(flag) = flags
+        .iter()
+        .find(|flag| flag.starts_with('-'))
+    {
         return Err(unknown_flag(flag, INIT_USAGE));
     }
 
-    match flags.iter().chain(after).collect::<Vec<_>>().as_slice() {
+    match flags
+        .iter()
+        .chain(after)
+        .collect::<Vec<_>>()
+        .as_slice()
+    {
         [] => Ok(Command::Init(".".into())),
         [directory] => Ok(Command::Init(directory.into())),
         _ => Err(Usage {
@@ -193,7 +209,9 @@ fn split_options(arguments: &[String]) -> (&[String], &[String]) {
         .map_or((arguments, &[]), |at| {
             (
                 arguments.get(..at).unwrap_or_default(),
-                arguments.get(at + 1..).unwrap_or_default(),
+                arguments
+                    .get(at + 1..)
+                    .unwrap_or_default(),
             )
         })
 }
@@ -345,7 +363,9 @@ mod tests {
     use super::{Command, parse};
 
     fn words(line: &str) -> Vec<String> {
-        line.split_whitespace().map(str::to_owned).collect()
+        line.split_whitespace()
+            .map(str::to_owned)
+            .collect()
     }
 
     fn parsed(line: &str) -> Command {

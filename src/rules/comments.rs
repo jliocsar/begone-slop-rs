@@ -46,7 +46,10 @@ fn runs(source: &Source) -> Vec<CommentRun> {
         .iter()
         .filter(|comment| comment.kind == CommentKind::Line && !comment.after_code)
         .fold(Vec::new(), |mut runs: Vec<CommentRun>, comment| {
-            let text = comment.text.trim_start_matches('/').trim();
+            let text = comment
+                .text
+                .trim_start_matches('/')
+                .trim();
 
             match runs.last_mut() {
                 Some(run) if run.last + 1 == comment.line => {
@@ -66,8 +69,12 @@ fn runs(source: &Source) -> Vec<CommentRun> {
 }
 
 fn looks_like_code(text: &str) -> bool {
-    let has_marks = CODE_MARKS.iter().any(|mark| text.contains(mark));
-    let is_directive = DIRECTIVES.iter().any(|directive| text.contains(directive));
+    let has_marks = CODE_MARKS
+        .iter()
+        .any(|mark| text.contains(mark));
+    let is_directive = DIRECTIVES
+        .iter()
+        .any(|directive| text.contains(directive));
 
     has_marks && !is_directive && syn::parse_str::<syn::Block>(&format!("{{\n{text}\n}}")).is_ok()
 }

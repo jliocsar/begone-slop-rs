@@ -307,7 +307,11 @@ pub fn run(file: &FileContext) -> Vec<Finding> {
     let (waived, mut findings): (Vec<Finding>, Vec<Finding>) = CHECKS
         .iter()
         .flat_map(|check| check(file))
-        .partition(|finding| file.waivers.iter().any(|waiver| waiver.waives(finding)));
+        .partition(|finding| {
+            file.waivers
+                .iter()
+                .any(|waiver| waiver.waives(finding))
+        });
 
     findings.extend(waivers::unused(&file.waivers, &waived));
     findings.sort_by_key(|finding| finding.line);
@@ -431,7 +435,10 @@ mod tests {
             .unwrap();
         let mut table: Vec<(&str, bool)> = section
             .lines()
-            .filter_map(|line| line.strip_prefix("| `")?.split_once('`'))
+            .filter_map(|line| {
+                line.strip_prefix("| `")?
+                    .split_once('`')
+            })
             .map(|(name, rest)| (name, rest.contains('✅')))
             .collect();
         let mut syntax: Vec<(&str, bool)> = RULES

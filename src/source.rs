@@ -64,7 +64,10 @@ impl Source {
 
         Self {
             path,
-            lines: text.lines().map(str::to_owned).collect(),
+            lines: text
+                .lines()
+                .map(str::to_owned)
+                .collect(),
             comments: Lexer::comments(text),
             line_break,
             trailing_newline: text.ends_with('\n'),
@@ -92,7 +95,8 @@ impl Source {
 
     #[must_use]
     pub fn is_blank(&self, number: usize) -> bool {
-        self.line(number).is_none_or(|text| text.trim().is_empty())
+        self.line(number)
+            .is_none_or(|text| text.trim().is_empty())
     }
 
     /// Every comment in the file, in order, told apart from string and character literals
@@ -134,11 +138,20 @@ impl Source {
             .into_iter()
             .zip(1..)
             .flat_map(|(text, number)| {
-                let replaced = replacements.get(&number).copied().unwrap_or_default();
+                let replaced = replacements
+                    .get(&number)
+                    .copied()
+                    .unwrap_or_default();
                 let kept = (!deletes.contains(&number)).then_some(text);
-                let blank = inserts.contains(&number).then(String::new);
+                let blank = inserts
+                    .contains(&number)
+                    .then(String::new);
 
-                replaced.iter().cloned().chain(kept).chain(blank)
+                replaced
+                    .iter()
+                    .cloned()
+                    .chain(kept)
+                    .chain(blank)
             })
             .collect();
         self.comments = Lexer::comments(&self.text());
@@ -173,7 +186,9 @@ impl Lexer {
     }
 
     fn peek(&self, ahead: usize) -> Option<char> {
-        self.characters.get(self.at + ahead).copied()
+        self.characters
+            .get(self.at + ahead)
+            .copied()
     }
 
     /// Steps over one character that isn't in a comment.
@@ -211,7 +226,9 @@ impl Lexer {
                 CommentKind::Line
             },
             text: if doc {
-                body.get(1..).unwrap_or_default().to_owned()
+                body.get(1..)
+                    .unwrap_or_default()
+                    .to_owned()
             } else {
                 body
             },

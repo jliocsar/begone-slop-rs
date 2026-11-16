@@ -117,7 +117,12 @@ fn call_work(call: &ExprCall) -> Option<&'static str> {
             .path
             .segments
             .last()
-            .is_some_and(|segment| segment.ident.to_string().starts_with(char::is_uppercase)),
+            .is_some_and(|segment| {
+                segment
+                    .ident
+                    .to_string()
+                    .starts_with(char::is_uppercase)
+            }),
         _ => false,
     };
 

@@ -116,8 +116,13 @@ impl TryFrom<String> for ModulePath {
     type Error = NotAModulePath;
 
     fn try_from(written: String) -> Result<Self, Self::Error> {
-        let segments: Vec<String> = written.split("::").map(str::to_owned).collect();
-        let rooted = segments.first().is_some_and(|first| first == "crate");
+        let segments: Vec<String> = written
+            .split("::")
+            .map(str::to_owned)
+            .collect();
+        let rooted = segments
+            .first()
+            .is_some_and(|first| first == "crate");
         let named = segments
             .iter()
             .skip(1)
@@ -157,10 +162,12 @@ impl Config {
     /// Fails when `root` can't be resolved, the file can't be read or parsed, or an entry
     /// names a path or module that doesn't exist.
     pub fn load(root: &Path) -> Result<Self, ConfigError> {
-        let root = root.canonicalize().map_err(|cause| ConfigError::Read {
-            path: root.to_owned(),
-            cause,
-        })?;
+        let root = root
+            .canonicalize()
+            .map_err(|cause| ConfigError::Read {
+                path: root.to_owned(),
+                cause,
+            })?;
         let path = root.join(FILE_NAME);
 
         let text = match fs::read_to_string(&path) {
@@ -179,13 +186,15 @@ impl Config {
             cause,
         })?;
 
-        config.problem().map_or(Ok(config), |(entry, problem)| {
-            Err(ConfigError::Invalid {
-                path,
-                entry,
-                problem,
+        config
+            .problem()
+            .map_or(Ok(config), |(entry, problem)| {
+                Err(ConfigError::Invalid {
+                    path,
+                    entry,
+                    problem,
+                })
             })
-        })
     }
 
     /// Parses `bs.toml`'s text as the config of a project at `root`, without checking that
@@ -212,7 +221,11 @@ impl Config {
         };
 
         if let Some(io) = &mut self.io {
-            io.allowed = io.allowed.iter().map(|path| plain(path)).collect();
+            io.allowed = io
+                .allowed
+                .iter()
+                .map(|path| plain(path))
+                .collect();
         }
 
         for layers in &mut self.layers {
@@ -223,22 +236,27 @@ impl Config {
     /// The first entry that names nothing, and why: `(entry, problem)`.
     fn problem(&self) -> Option<(String, String)> {
         let io = self.io.iter();
-        let allowed = io.clone().flat_map(|io| &io.allowed).find_map(|allowed| {
-            (!self.root.join(allowed).exists()).then(|| {
-                (
-                    format!("[io] allowed `{}`", allowed.display()),
-                    "no such file or directory under the project's root".to_owned(),
-                )
-            })
-        });
-        let effects = io.flat_map(|io| &io.effects).find_map(|effect| {
-            (!effect.split("::").all(is_identifier)).then(|| {
-                (
-                    format!("[io] effects `{effect}`"),
-                    "an effect is a path like `sqlx` or `tokio::fs`".to_owned(),
-                )
-            })
-        });
+        let allowed = io
+            .clone()
+            .flat_map(|io| &io.allowed)
+            .find_map(|allowed| {
+                (!self.root.join(allowed).exists()).then(|| {
+                    (
+                        format!("[io] allowed `{}`", allowed.display()),
+                        "no such file or directory under the project's root".to_owned(),
+                    )
+                })
+            });
+        let effects = io
+            .flat_map(|io| &io.effects)
+            .find_map(|effect| {
+                (!effect.split("::").all(is_identifier)).then(|| {
+                    (
+                        format!("[io] effects `{effect}`"),
+                        "an effect is a path like `sqlx` or `tokio::fs`".to_owned(),
+                    )
+                })
+            });
 
         allowed.or(effects).or_else(|| {
             self.layers
@@ -288,14 +306,20 @@ fn module_exists(source: &Path, segments: &[String]) -> bool {
     }
 
     let parent_directory: PathBuf = parents.iter().skip(1).collect();
-    let own = source.join(&parent_directory).join(last);
+    let own = source
+        .join(&parent_directory)
+        .join(last);
 
     let parent_files = if parents.len() == 1 {
         vec![source.join("lib.rs"), source.join("main.rs")]
     } else {
         vec![
-            source.join(&parent_directory).with_extension("rs"),
-            source.join(&parent_directory).join("mod.rs"),
+            source
+                .join(&parent_directory)
+                .with_extension("rs"),
+            source
+                .join(&parent_directory)
+                .join("mod.rs"),
         ]
     };
 
@@ -339,12 +363,18 @@ mod tests {
         let config = Config {
             root: Path::new(env!("CARGO_MANIFEST_DIR")).to_owned(),
             io: Some(IoBoundary {
-                allowed: allowed.iter().map(PathBuf::from).collect(),
+                allowed: allowed
+                    .iter()
+                    .map(PathBuf::from)
+                    .collect(),
                 effects: vec!["sqlx".to_owned(), "tokio::fs".to_owned()],
             }),
             layers: vec![Layers {
                 crate_root: crate_root.into(),
-                order: order.iter().map(|written| module(written)).collect(),
+                order: order
+                    .iter()
+                    .map(|written| module(written))
+                    .collect(),
             }],
         };
 

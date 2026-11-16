@@ -70,7 +70,9 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     };
 
     errors.visit_file(file.syntax);
-    errors.findings.dedup_by_key(|finding| finding.line);
+    errors
+        .findings
+        .dedup_by_key(|finding| finding.line);
 
     errors.findings
 }

@@ -64,7 +64,11 @@ impl<'ast> Visit<'ast> for PreferMatch {
             .trait_
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
-            .is_some_and(|segment| PARSE_TRAITS.iter().any(|name| segment.ident == name));
+            .is_some_and(|segment| {
+                PARSE_TRAITS
+                    .iter()
+                    .any(|name| segment.ident == name)
+            });
 
         self.parse_depth += usize::from(parses);
         visit::visit_item_impl(self, implementation);
@@ -76,13 +80,19 @@ impl<'ast> Visit<'ast> for PreferMatch {
             .iter()
             .map(|link| subject_of(&link.cond))
             .collect();
-        let one_subject = subjects.as_ref().is_some_and(|subjects| {
-            subjects.len() >= MIN_BRANCHES
-                && subjects.windows(2).all(|pair| pair.first() == pair.get(1))
-        });
+        let one_subject = subjects
+            .as_ref()
+            .is_some_and(|subjects| {
+                subjects.len() >= MIN_BRANCHES
+                    && subjects
+                        .windows(2)
+                        .all(|pair| pair.first() == pair.get(1))
+            });
 
         if one_subject
-            && let Some(subject) = subjects.as_ref().and_then(|subjects| subjects.first())
+            && let Some(subject) = subjects
+                .as_ref()
+                .and_then(|subjects| subjects.first())
         {
             let strings = chain(branch)
                 .iter()
@@ -119,7 +129,11 @@ impl<'ast> Visit<'ast> for PreferMatch {
 /// `if a {} else if b {} else if c {}` as `[a, b, c]`.
 fn chain(first: &ExprIf) -> Vec<&ExprIf> {
     std::iter::successors(Some(first), |link| {
-        match link.else_branch.as_ref().map(|(_, otherwise)| &**otherwise) {
+        match link
+            .else_branch
+            .as_ref()
+            .map(|(_, otherwise)| &**otherwise)
+        {
             Some(Expr::If(next)) => Some(next),
             _ => None,
         }
@@ -134,7 +148,12 @@ fn subject_of(condition: &Expr) -> Option<String> {
     };
 
     match binary.op {
-        BinOp::Eq(_) if is_fixed(&binary.right) => Some(binary.left.to_token_stream().to_string()),
+        BinOp::Eq(_) if is_fixed(&binary.right) => Some(
+            binary
+                .left
+                .to_token_stream()
+                .to_string(),
+        ),
         BinOp::Or(_) => {
             let left = subject_of(&binary.left)?;
 
@@ -159,7 +178,9 @@ fn compares_strings(condition: &Expr) -> bool {
 }
 
 fn is_parse_name(name: &str) -> bool {
-    PARSE_PREFIXES.iter().any(|prefix| name.starts_with(prefix))
+    PARSE_PREFIXES
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
 }
 
 /// A literal, or a path such as an enum variant or a constant.

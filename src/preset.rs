@@ -62,7 +62,11 @@ mod tests {
     fn the_embedded_presets_parse() {
         let entries = lint_entries().unwrap();
 
-        assert!(entries.iter().any(|entry| entry.name == "clippy::pedantic"));
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.name == "clippy::pedantic")
+        );
         assert!(
             clippy_settings()
                 .unwrap()

@@ -38,7 +38,11 @@ impl<'ast> Visit<'ast> for MixedOperators {
                 let inner_symbol = symbol(&inner.op);
                 let outer_symbol = symbol(&expression.op);
 
-                if self.findings.last().is_none_or(|last| last.line != line) {
+                if self
+                    .findings
+                    .last()
+                    .is_none_or(|last| last.line != line)
+                {
                     self.findings.push(Finding {
                         line,
                         rule: Rule::ParenthesizeMixedOperators,

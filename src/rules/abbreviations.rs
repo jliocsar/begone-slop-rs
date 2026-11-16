@@ -65,7 +65,9 @@ impl Abbreviations {
     fn name(&mut self, ident: &Ident) {
         let name = ident.to_string();
         let line = ident.span().start().line;
-        let bare = name.trim_start_matches("r#").trim_matches('_');
+        let bare = name
+            .trim_start_matches("r#")
+            .trim_matches('_');
 
         if bare.chars().count() == 1 && bare.len() < name.len() {
             self.findings.push(Finding {

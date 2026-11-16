@@ -49,8 +49,11 @@ pub fn rust_files(paths: &[PathBuf]) -> io::Result<Vec<PathBuf>> {
 #[must_use]
 pub fn named(root: &Path, names: &[&str]) -> Vec<PathBuf> {
     let has_name = |path: &Path| {
-        path.file_name()
-            .is_some_and(|name| names.iter().any(|wanted| name == *wanted))
+        path.file_name().is_some_and(|name| {
+            names
+                .iter()
+                .any(|wanted| name == *wanted)
+        })
     };
 
     let candidates = tracked_by_git(root, None)
@@ -87,7 +90,9 @@ pub fn project_root(start: &Path) -> PathBuf {
                 return false;
             };
 
-            let relative = package.strip_prefix(directory).unwrap_or(package);
+            let relative = package
+                .strip_prefix(directory)
+                .unwrap_or(package);
 
             let listed = |key: &str| {
                 workspace
@@ -145,19 +150,22 @@ fn components_match(parts: &[&str], names: &[String]) -> bool {
 fn wildcard_matches(pattern: &str, name: &str) -> bool {
     match pattern.split_once('*') {
         None => pattern == name,
-        Some((prefix, rest)) => name.strip_prefix(prefix).is_some_and(|tail| {
-            (0..=tail.len())
-                .filter(|start| tail.is_char_boundary(*start))
-                .any(|start| {
-                    tail.get(start..)
-                        .is_some_and(|suffix| wildcard_matches(rest, suffix))
-                })
-        }),
+        Some((prefix, rest)) => name
+            .strip_prefix(prefix)
+            .is_some_and(|tail| {
+                (0..=tail.len())
+                    .filter(|start| tail.is_char_boundary(*start))
+                    .any(|start| {
+                        tail.get(start..)
+                            .is_some_and(|suffix| wildcard_matches(rest, suffix))
+                    })
+            }),
     }
 }
 
 fn is_rust(path: &Path) -> bool {
-    path.extension().is_some_and(|extension| extension == "rs")
+    path.extension()
+        .is_some_and(|extension| extension == "rs")
 }
 
 fn tracked_by_git(directory: &Path, pattern: Option<&str>) -> Option<Vec<PathBuf>> {
@@ -193,7 +201,10 @@ fn walk(directory: &Path, keep: &dyn Fn(&Path) -> bool) -> io::Result<Vec<PathBu
 
     for entry in fs::read_dir(directory)? {
         let path = entry?.path();
-        let name = path.file_name().unwrap_or_default().to_string_lossy();
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy();
         let skipped = name.starts_with('.') || SKIPPED_DIRECTORIES.contains(&name.as_ref());
 
         if path.is_dir() && !skipped {
