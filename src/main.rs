@@ -266,10 +266,10 @@ fn run_check(options: &Options) -> Result<ExitCode, Fatal> {
     }
 
     let patterns = if clean { "clean" } else { "failed" };
+    let files = paths.len();
 
     println!(
-        "cargo bs: {problems} finding(s) in {} file(s) and the gate's config; pattern rules {patterns}",
-        paths.len()
+        "cargo bs: {problems} finding(s) in {files} file(s) and the gate's config; pattern rules {patterns}"
     );
 
     Ok(ExitCode::FAILURE)
@@ -311,11 +311,12 @@ fn check_files(paths: &[PathBuf], mode: Mode, project: &Project) -> (usize, usiz
         match check::check_file(path, mode, project) {
             Ok(report) => {
                 for finding in &report.findings {
+                    let rule = finding.rule.name();
+
                     println!(
-                        "{}:{}: {}: {}",
+                        "{}:{}: {rule}: {}",
                         report.source.path.display(),
                         finding.line,
-                        finding.rule.name(),
                         finding.message
                     );
                 }

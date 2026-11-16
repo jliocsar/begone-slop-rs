@@ -225,10 +225,8 @@ mod tests {
 
     #[test]
     fn a_waiver_with_a_reason_silences_it() {
-        let text = format!(
-            "// bs-allow(complexity): one arm per opcode reads best\n{}",
-            function_with_ifs(15)
-        );
+        let function = function_with_ifs(15);
+        let text = format!("// bs-allow(complexity): one arm per opcode reads best\n{function}");
 
         assert_eq!(lines_of(Rule::Complexity, &text), NONE);
     }

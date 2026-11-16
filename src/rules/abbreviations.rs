@@ -4,7 +4,13 @@
 //! Only names this code declares are checked (bindings, parameters, functions, fields,
 //! types, variants, constants), never the names it uses from other crates. Methods in a
 //! trait impl keep the trait's names. The list is the abbreviations that need decoding;
-//! words the language itself uses, like `str`, `len`, `args` or `fmt`, aren't on it.
+//! words the language itself uses, like `str`, `len`, `args` or `fmt`, aren't on it. A name
+//! that's one letter behind underscores (`_x`, `f_`) is an abbreviation too; a plain one-letter
+//! name is clippy's `min_ident_chars`.
+//!
+//! `no-ceremony-names` reads the same names for a last word that says nothing about the
+//! thing: `UserManager`, `ParserFactory`, `StoreImpl`, `config_old`. `impl` counts only on a
+//! type's name: in `in_trait_impl` it's Rust's `impl` block.
 
 use proc_macro2::Ident;
 use syn::visit::{self, Visit};
@@ -45,6 +51,11 @@ const ABBREVIATIONS: [(&str, &str); 27] = [
     ("val", "value"),
 ];
 
+/// Last words that name a role in a pattern, or a leftover, instead of what the thing is.
+const CEREMONY_WORDS: [&str; 7] = [
+    "bak", "factory", "helper", "helpers", "impl", "manager", "old",
+];
+
 struct Abbreviations {
     findings: Vec<Finding>,
     in_trait_impl: bool,
@@ -53,7 +64,35 @@ struct Abbreviations {
 impl Abbreviations {
     fn name(&mut self, ident: &Ident) {
         let name = ident.to_string();
-        let spelled_out = words(&name).into_iter().find_map(|word| {
+        let line = ident.span().start().line;
+        let bare = name.trim_start_matches("r#").trim_matches('_');
+
+        if bare.chars().count() == 1 && bare.len() < name.len() {
+            self.findings.push(Finding {
+                line,
+                rule: Rule::NoAbbreviations,
+                message: format!("`{name}` is one letter behind underscores; name what it holds"),
+                edit: None,
+            });
+        }
+
+        let parts = words(&name);
+
+        if let Some(last) = parts
+            .last()
+            .filter(|word| CEREMONY_WORDS.contains(&word.as_str()))
+            .filter(|word| *word != "impl" || name.starts_with(char::is_uppercase))
+            && parts.len() > 1
+        {
+            self.findings.push(Finding {
+                line,
+                rule: Rule::NoCeremonyNames,
+                message: format!("`{name}` ends in `{last}`, which says nothing about what it is; name what it holds or does"),
+                edit: None,
+            });
+        }
+
+        let spelled_out = parts.into_iter().find_map(|word| {
             ABBREVIATIONS
                 .iter()
                 .find(|(short, _)| *short == word)
@@ -62,7 +101,7 @@ impl Abbreviations {
 
         if let Some((short, long)) = spelled_out {
             self.findings.push(Finding {
-                line: ident.span().start().line,
+                line,
                 rule: Rule::NoAbbreviations,
                 message: format!("`{name}` abbreviates `{short}`; spell it out ({long})"),
                 edit: None,
@@ -210,6 +249,20 @@ mod tests {
         let text = "fn handle(context: &Context) {\n    let message = context.cfg.msg();\n}\n";
 
         assert_eq!(lines_of(Rule::NoAbbreviations, text), NONE);
+    }
+
+    #[test]
+    fn one_letter_behind_underscores_is_reported() {
+        let text = "fn main() {\n    let _x = 1;\n    let f_ = 2;\n    let _ = 3;\n    let _width = 4;\n}\n";
+
+        assert_eq!(lines_of(Rule::NoAbbreviations, text), [2, 3]);
+    }
+
+    #[test]
+    fn ceremony_last_words_are_reported() {
+        let text = "struct UserManager;\nstruct ParserFactory;\nstruct StoreImpl;\n\nfn load(config_old: Config, old_config: Config, manager: Manager, in_trait_impl: bool) {}\n";
+
+        assert_eq!(lines_of(Rule::NoCeremonyNames, text), [1, 2, 3, 5]);
     }
 
     #[test]

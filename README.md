@@ -173,6 +173,8 @@ never edits your Cargo.toml.
 | one module layout                           | `mod_module_files`: `foo.rs` next to `foo/`, never `foo/mod.rs`      |
 | panics the preset's bans don't name         | `unreachable`, `exit` (outside `main`), and `no-panic-bypass` below  |
 | test-only branches in shipped code          | `cfg_not_test`, and `no-cfg-test-in-prod` below                      |
+| operators mixed without parentheses         | `precedence_bits`, and `parenthesize-mixed-operators` below          |
+| a raw string with nothing to escape         | `needless_raw_strings`, `needless_raw_string_hashes`                 |
 
 Clippy's own `cognitive_complexity` is left off. Clippy's docs say it doesn't measure what it
 claims to, so `cargo bs` counts cyclomatic complexity itself.
@@ -189,7 +191,8 @@ The Effect rules have no Rust counterpart. `no-switch` doesn't port, since `matc
 | `complexity`           | a function with cyclomatic complexity over 15                                         |  —  |
 | `reexport-only-module` | a module file that only re-exports (`lib.rs` and `main.rs` are exempt)                |  —  |
 | `use-groups`           | imports not grouped std → other crates → this crate, one blank line between groups    | ✅  |
-| `no-abbreviations`     | a declared name with an abbreviation that needs decoding (`ctx`, `cfg`, `idx`, `msg`…) |  —  |
+| `no-abbreviations`     | a declared name with an abbreviation that needs decoding (`ctx`, `cfg`, `idx`, `msg`…), or one letter behind underscores (`_x`, `f_`) |  —  |
+| `no-ceremony-names`    | a declared name ending in `Manager`, `Factory`, `Helper(s)`, `Impl`, `old` or `bak`   |  —  |
 | `test-name`            | a test named `test_*`, `*_test`, `test2`, `it_works`, `works`, `basic` or `smoke`     |  —  |
 | `no-sleep-in-tests`    | `sleep` in test code (`thread::sleep`, `tokio::time::sleep`, …)                       |  —  |
 | `test-must-assert`     | a `#[test]` with no assertion, no `#[should_panic]`, and no call to a helper that asserts; `assert!(true)` and other asserts of constants don't count, `.assert()` and `insta::assert_*!` do |  —  |
@@ -212,6 +215,9 @@ The Effect rules have no Rust counterpart. `no-switch` doesn't port, since `matc
 | `no-anyhow-in-lib`     | `anyhow`, `eyre` or `color_eyre` in library code; binaries, build scripts, tests, examples and benches may use them |  —  |
 | `test-conditional-assert` | an assertion in a test that sits under an `if let` with no `else`, or in a `match` next to `_ => {}`: it never runs when the case fails |  —  |
 | `test-early-return`    | a `return` (or `return Ok(())`) inside a branch of a `#[test]`: a skip that reports a pass; use `#[ignore = "why"]` |  —  |
+| `no-work-in-format-args` | a method call, function call, closure, operator, cast or block as an argument of `println!`, `format!`, `write!` and friends; literals, names, fields, references, indexes, constructors and macros pass |  —  |
+| `no-needless-main-result` | `fn main() -> Result<..>` whose only way out is the `Ok(())` at its end (a `?` in a closure doesn't count) |  —  |
+| `parenthesize-mixed-operators` | a bitwise operator or shift with another operator under it (`y * y ^ 0xff`), or a comparison with one under it (`y & 1 == 0`); one operator repeated, and arithmetic under a comparison, pass |  —  |
 | `no-cfg-test-in-prod`  | in shipped code, `cfg!(test)`, `#[cfg(test)]` inside a function body, and `*_for_test(s)`/`*_for_testing`/`test_only_*` functions outside `#[cfg(test)]` |  —  |
 
 Test code, which several rules exempt or only check, is a `#[test]` function, a `#[cfg(test)]`
@@ -272,7 +278,9 @@ with a comment inside is only reported, since the comment could belong to either
 `no-abbreviations` checks only the names your code declares: bindings, parameters, functions,
 fields, types, variants and constants. Names used from other crates, and methods in a trait impl,
 are left alone. Words the language itself uses, like `str`, `len`, `args` and `fmt`, aren't on the
-list. Neither are domain words like `expr` or `stmt`.
+list. Neither are domain words like `expr` or `stmt`. A plain one-letter name is clippy's
+`min_ident_chars`; the rule catches the ones an underscore hides from it. `no-ceremony-names` reads
+the same names, and only their last word, so `old_config` passes and `config_old` doesn't.
 
 `no-boolean-trap`, `newtype-ids` and `no-stringly-fields` read a type alias in the same file as
 what it names: `type Flag = bool;` doesn't hide a `bool` parameter.
@@ -303,6 +311,7 @@ fn key_name(key: Key) -> &'static str {
 | `no-detached-tasks`    | `tokio::spawn(..)` / `thread::spawn(..)` with the handle dropped |
 | `error-message-style`  | `#[error("Capitalised.")]`: lowercase, no trailing period (C-GOOD-ERR) |
 | `no-rc-refcell`        | `Rc<RefCell<_>>` and `Rc<Cell<_>>`: give the state one owner      |
+| `no-needless-turbofish` | `let total: i32 = xs.iter().sum::<i32>()`: the type is written twice |
 
 A bare `#[ignore]` is clippy's `ignore_without_reason`, which the preset turns on with the
 pedantic group. Waive a pattern rule with ast-grep's own comment, on its own line above the code:

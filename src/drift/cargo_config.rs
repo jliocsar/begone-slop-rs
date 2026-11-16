@@ -218,16 +218,15 @@ fn flag_bypasses(key: &str, flags: &[String], preset: &[Entry]) -> Vec<Bypass> {
         };
 
         if lowers {
+            let shown_value = if flag.ends_with(&value) {
+                String::new()
+            } else {
+                format!(" {value}")
+            };
+
             found.push(Bypass {
                 key: key.to_owned(),
-                message: format!(
-                    "`{flag}{}` in {key} turns lints down behind the lints table's back; delete it",
-                    if flag.ends_with(&value) {
-                        String::new()
-                    } else {
-                        format!(" {value}")
-                    }
-                ),
+                message: format!("`{flag}{shown_value}` in {key} turns lints down behind the lints table's back; delete it"),
             });
         }
     }

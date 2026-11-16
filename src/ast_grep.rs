@@ -15,13 +15,14 @@ macro_rules! pattern_rules {
 }
 
 /// The files in `rules/`, by id. A test keeps this list and the directory equal.
-pub const RULES: [(&str, &str); 13] = pattern_rules![
+pub const RULES: [(&str, &str); 14] = pattern_rules![
     "error-message-style",
     "no-box-dyn-error",
     "no-catch-unwind",
     "no-detached-tasks",
     "no-glob-reexport",
     "no-global-state",
+    "no-needless-turbofish",
     "no-rc-refcell",
     "no-string-error",
     "no-stringified-error",

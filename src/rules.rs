@@ -8,14 +8,17 @@ mod comments;
 mod complexity;
 mod exhaustive;
 mod file_context;
+mod format_args;
 mod gap;
 mod hidden_code;
 mod io_boundary;
 mod layers;
 mod library_errors;
 mod lint_waivers;
+mod main_result;
 mod modules;
 mod names;
+mod operators;
 mod padding;
 mod panic_bypass;
 mod paths;
@@ -69,7 +72,7 @@ macro_rules! rules {
 
 /// Every check the syntax engine runs, in order. Each reads one file and returns what it
 /// found, for one rule or several.
-const CHECKS: [fn(&FileContext) -> Vec<Finding>; 24] = [
+const CHECKS: [fn(&FileContext) -> Vec<Finding>; 27] = [
     padding::check,
     assert_padding::check,
     complexity::check,
@@ -94,6 +97,9 @@ const CHECKS: [fn(&FileContext) -> Vec<Finding>; 24] = [
     panic_bypass::check,
     library_errors::check,
     test_honesty::check,
+    format_args::check,
+    main_result::check,
+    operators::check,
 ];
 
 rules! {
@@ -107,6 +113,7 @@ rules! {
     NoAnyhowInLib => "no-anyhow-in-lib", Syntax, false;
     NoBlockingInAsync => "no-blocking-in-async", Syntax, false;
     NoBooleanTrap => "no-boolean-trap", Syntax, false;
+    NoCeremonyNames => "no-ceremony-names", Syntax, false;
     NoCommentedOutCode => "no-commented-out-code", Syntax, false;
     NoCrateLevelAllow => "no-crate-level-allow", Gate, false;
     NoDiscardAssign => "no-discard-assign", Syntax, false;
@@ -115,6 +122,7 @@ rules! {
     NoHiddenCode => "no-hidden-code", Gate, false;
     NoJunkDrawerModules => "no-junk-drawer-modules", Syntax, false;
     NoMutableAccumulator => "no-mutable-accumulator", Syntax, false;
+    NoNeedlessMainResult => "no-needless-main-result", Syntax, false;
     NoNumberedNames => "no-numbered-names", Syntax, false;
     NoPanicBypass => "no-panic-bypass", Syntax, false;
     NoSilentErrorArm => "no-silent-err-arm", Syntax, false;
@@ -123,7 +131,9 @@ rules! {
     NoTestSwitchesInProduction => "no-cfg-test-in-prod", Syntax, false;
     NoTypeInName => "no-type-in-name", Syntax, false;
     NoWildcardOnLocalEnum => "no-wildcard-on-local-enum", Syntax, false;
+    NoWorkInFormatArgs => "no-work-in-format-args", Syntax, false;
     Padding => "padding", Syntax, true;
+    ParenthesizeMixedOperators => "parenthesize-mixed-operators", Syntax, false;
     PreferMatch => "prefer-match", Syntax, false;
     ReexportOnly => "reexport-only-module", Syntax, false;
     TestConditionalAssert => "test-conditional-assert", Syntax, false;

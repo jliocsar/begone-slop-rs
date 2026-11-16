@@ -8,7 +8,7 @@ async fn read_all(paths: &[PathBuf]) -> Vec<String> {
 }
 
 async fn in_macro(path: &Path) {
-    println!("{}", std::fs::read_to_string(path).unwrap_or_default()); //~ no-blocking-in-async
+    println!("{}", std::fs::read_to_string(path).unwrap_or_default()); //~ no-blocking-in-async, no-work-in-format-args
 }
 
 trait Store {

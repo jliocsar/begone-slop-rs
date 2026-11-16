@@ -213,7 +213,8 @@ pub fn entries(lints: &Table) -> (Vec<Entry>, Vec<String>) {
         };
 
         for (name, value) in table.as_table().into_iter().flatten() {
-            let full = format!("{prefix}{}", name.replace('-', "_"));
+            let lint = name.replace('-', "_");
+            let full = format!("{prefix}{lint}");
 
             match level_and_priority(value) {
                 Some((level, priority)) => found.push(Entry {
