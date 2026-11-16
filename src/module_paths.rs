@@ -20,11 +20,16 @@ pub enum FileKind {
 /// `mod.rs` and other target roots, `a/b/` for `a/b.rs`.
 #[must_use]
 pub fn children_directory(file: &Path, kind: FileKind) -> PathBuf {
-    let directory = file.parent().unwrap_or_else(|| Path::new("")).to_owned();
+    let directory = file
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .to_owned();
     let mod_rs = kind == FileKind::TargetRoot
-        || file
-            .file_name()
-            .is_some_and(|name| MOD_RS_NAMES.iter().any(|known| name == *known));
+        || file.file_name().is_some_and(|name| {
+            MOD_RS_NAMES
+                .iter()
+                .any(|known| name == *known)
+        });
 
     match file.file_stem() {
         Some(stem) if !mod_rs => directory.join(stem),
@@ -50,7 +55,9 @@ pub fn candidates(children: &Path, inline: &[String], name: &str) -> [PathBuf; 2
 #[must_use]
 pub fn path_target(file: &Path, children: &Path, inline: &[String], value: &str) -> PathBuf {
     let base = if inline.is_empty() {
-        file.parent().unwrap_or_else(|| Path::new("")).to_owned()
+        file.parent()
+            .unwrap_or_else(|| Path::new(""))
+            .to_owned()
     } else {
         inline
             .iter()
@@ -81,12 +88,14 @@ pub fn path_attribute(attributes: &[Attribute]) -> Option<String> {
 /// `cfg(all(...))`.
 #[must_use]
 pub fn is_test_only(attributes: &[Attribute]) -> bool {
-    attributes.iter().any(|attribute| match &attribute.meta {
-        Meta::List(list) if list.path.is_ident("cfg") => list
-            .parse_args::<Meta>()
-            .is_ok_and(|predicate| requires_test(&predicate)),
-        _ => false,
-    })
+    attributes
+        .iter()
+        .any(|attribute| match &attribute.meta {
+            Meta::List(list) if list.path.is_ident("cfg") => list
+                .parse_args::<Meta>()
+                .is_ok_and(|predicate| requires_test(&predicate)),
+            _ => false,
+        })
 }
 
 fn requires_test(predicate: &Meta) -> bool {
@@ -164,7 +173,13 @@ mod tests {
 
     #[test]
     fn all_with_test_is_test_only() {
-        let only = |text: &str| is_test_only(&syn::parse_str::<syn::ItemMod>(text).unwrap().attrs);
+        let only = |text: &str| {
+            is_test_only(
+                &syn::parse_str::<syn::ItemMod>(text)
+                    .unwrap()
+                    .attrs,
+            )
+        };
 
         assert!(only("#[cfg(test)] mod tests;"));
         assert!(only("#[cfg(all(test, feature = \"x\"))] mod tests;"));

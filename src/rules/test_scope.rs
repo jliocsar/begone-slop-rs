@@ -35,16 +35,27 @@ impl TestLines {
 
     /// Whether `line` is test code.
     pub(super) fn contains(&self, line: usize) -> bool {
-        self.whole_file || self.ranges.iter().any(|range| range.contains(&line))
+        self.whole_file
+            || self
+                .ranges
+                .iter()
+                .any(|range| range.contains(&line))
     }
 }
 
 impl<'ast> Visit<'ast> for TestLines {
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
         if is_test_fn(&function.attrs) {
-            let last = function.block.brace_token.span.close().end().line;
+            let last = function
+                .block
+                .brace_token
+                .span
+                .close()
+                .end()
+                .line;
 
-            self.ranges.push(function.span().start().line..=last);
+            self.ranges
+                .push(function.span().start().line..=last);
         } else {
             visit::visit_item_fn(self, function);
         }
@@ -63,7 +74,8 @@ impl<'ast> Visit<'ast> for TestLines {
             (None, None) => module.ident.span().end().line,
         };
 
-        self.ranges.push(module.span().start().line..=last);
+        self.ranges
+            .push(module.span().start().line..=last);
     }
 }
 

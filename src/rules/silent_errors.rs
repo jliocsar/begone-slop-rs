@@ -67,7 +67,10 @@ impl SilentErrors<'_> {
         let line = call.method.span().start().line;
         let keeps_ok = matches!(method.as_str(), "filter_map" | "flat_map")
             && call.args.len() == 1
-            && call.args.first().is_some_and(only_keeps_ok);
+            && call
+                .args
+                .first()
+                .is_some_and(only_keeps_ok);
         let flattens_results =
             method == "flatten" && call.args.is_empty() && yields_results(&call.receiver);
 
@@ -142,7 +145,10 @@ fn ignores_error(pattern: &Pat) -> bool {
 
     let ignored = match tuple.elems.first() {
         Some(Pat::Wild(_) | Pat::Rest(_)) => true,
-        Some(Pat::Ident(binding)) => binding.ident.to_string().starts_with('_'),
+        Some(Pat::Ident(binding)) => binding
+            .ident
+            .to_string()
+            .starts_with('_'),
         _ => false,
     };
 
@@ -168,7 +174,10 @@ fn is_silent(body: &Expr) -> bool {
         Expr::Tuple(tuple) => tuple.elems.is_empty(),
         Expr::Continue(_) => true,
         Expr::Break(stop) => stop.expr.is_none(),
-        Expr::Return(stop) => stop.expr.as_deref().is_none_or(is_empty_value),
+        Expr::Return(stop) => stop
+            .expr
+            .as_deref()
+            .is_none_or(is_empty_value),
         Expr::Path(path) => path.path.is_ident("None"),
         Expr::Call(call) => {
             call.args.is_empty()
@@ -236,7 +245,9 @@ fn yields_results(receiver: &Expr) -> bool {
         Expr::Try(inner) => yields_results(&inner.expr),
         Expr::Call(call) => matches!(&*call.func, Expr::Path(path)
             if path.path.segments.last().is_some_and(|segment| FALLIBLE_ITEMS.iter().any(|name| segment.ident == name))),
-        Expr::MethodCall(call) => FALLIBLE_ITEMS.iter().any(|name| call.method == name),
+        Expr::MethodCall(call) => FALLIBLE_ITEMS
+            .iter()
+            .any(|name| call.method == name),
         _ => false,
     }
 }

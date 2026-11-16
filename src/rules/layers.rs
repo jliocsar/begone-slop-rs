@@ -53,7 +53,10 @@ impl LayerCheck<'_> {
         let mut resolved = self.module.clone();
         let mut rest = written.iter().peekable();
 
-        while rest.next_if(|segment| *segment == "super").is_some() {
+        while rest
+            .next_if(|segment| *segment == "super")
+            .is_some()
+        {
             resolved.pop();
         }
 
@@ -103,7 +106,8 @@ impl LayerCheck<'_> {
 
 impl<'ast> Visit<'ast> for LayerCheck<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        self.module.push(module.ident.to_string());
+        self.module
+            .push(module.ident.to_string());
         visit::visit_item_mod(self, module);
         self.module.pop();
     }
@@ -141,7 +145,11 @@ fn module_path(relative: &Path) -> Option<Vec<String>> {
         parts.pop();
     }
 
-    Some(std::iter::once("crate".to_owned()).chain(parts).collect())
+    Some(
+        std::iter::once("crate".to_owned())
+            .chain(parts)
+            .collect(),
+    )
 }
 
 pub(super) fn check(file: &FileContext) -> Vec<Finding> {
@@ -157,7 +165,9 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
         .layers
         .iter()
         .filter_map(|layers| {
-            let inside = relative.strip_prefix(&layers.crate_root).ok()?;
+            let inside = relative
+                .strip_prefix(&layers.crate_root)
+                .ok()?;
             let module = module_path(inside)?;
             let mut layer_check = LayerCheck {
                 layers,
@@ -193,7 +203,10 @@ mod tests {
         let mut layer_check = LayerCheck {
             layers: &layers,
             tests: &tests,
-            module: module.split("::").map(str::to_owned).collect(),
+            module: module
+                .split("::")
+                .map(str::to_owned)
+                .collect(),
             findings: Vec::new(),
         };
         let file = syn::parse_file(text).unwrap();

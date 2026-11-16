@@ -97,7 +97,11 @@ pub(super) fn unused(waivers: &[Waiver], waived: &[Finding]) -> Vec<Finding> {
     waivers
         .iter()
         .filter(|waiver| waiver.is_in_force())
-        .filter(|waiver| !waived.iter().any(|finding| waiver.waives(finding)))
+        .filter(|waiver| {
+            !waived
+                .iter()
+                .any(|finding| waiver.waives(finding))
+        })
         .filter_map(|waiver| {
             let name = waiver.rule.as_ref().ok()?.name();
 
@@ -123,7 +127,8 @@ fn directive(comment: &Comment) -> &str {
 
 /// `bs-allow(<rule>): <reason>` as its rule name and reason.
 fn split_bs_allow(body: &str) -> Option<(&str, &str)> {
-    body.strip_prefix("bs-allow(")?.split_once("):")
+    body.strip_prefix("bs-allow(")?
+        .split_once("):")
 }
 
 fn bs_allow_problem(comment: &Comment, body: &str) -> Option<(Rule, String)> {

@@ -79,7 +79,9 @@ impl<'ast> Visit<'ast> for Exhaustive<'_> {
                 .iter()
                 .filter(|arm| arm.guard.is_none() && is_catch_all(&arm.pat))
             {
-                let line = arm.fat_arrow_token.spans[0].start().line;
+                let line = arm.fat_arrow_token.spans[0]
+                    .start()
+                    .line;
 
                 if self.tests.contains(line) {
                     continue;
@@ -103,9 +105,10 @@ impl<'ast> Visit<'ast> for Exhaustive<'_> {
         let outer = self.impl_self.take();
 
         self.impl_self = match &*implementation.self_ty {
-            Type::Path(path) if path.qself.is_none() => {
-                path.path.get_ident().map(ToString::to_string)
-            }
+            Type::Path(path) if path.qself.is_none() => path
+                .path
+                .get_ident()
+                .map(ToString::to_string),
             _ => None,
         };
 
@@ -116,7 +119,8 @@ impl<'ast> Visit<'ast> for Exhaustive<'_> {
 
 impl<'ast> Visit<'ast> for LocalEnums {
     fn visit_item_enum(&mut self, definition: &'ast ItemEnum) {
-        self.names.insert(definition.ident.to_string());
+        self.names
+            .insert(definition.ident.to_string());
         visit::visit_item_enum(self, definition);
     }
 }

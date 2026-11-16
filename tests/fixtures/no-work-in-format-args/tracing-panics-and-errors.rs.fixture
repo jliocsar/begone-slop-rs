@@ -1,0 +1,36 @@
+//@ path: src/main.rs
+//! Every macro that formats: tracing fields, panics, errors.
+
+use anyhow::{Result, anyhow, bail, ensure};
+use tracing::{debug, error, info, warn};
+
+fn hits(rows: &[u32], name: &str, path: &Path) -> Result<()> {
+    info!(count = rows.len(), "loaded"); //~ no-work-in-format-args
+    warn!(%name.trim(), "renamed"); //~ no-work-in-format-args
+    debug!(?rows.first(), "first"); //~ no-work-in-format-args
+    error!(target: "wyrm", "lost {}", name.to_uppercase()); //~ no-work-in-format-args
+    ensure!(rows.is_empty(), "left {}", rows.len()); //~ no-work-in-format-args
+
+    let failure = anyhow!("no {}", name.trim()); //~ no-work-in-format-args
+
+    if rows.len() > 3 {
+        panic!("bad {}", rows[0] as u8); //~ no-work-in-format-args
+    }
+
+    bail!("{failure}: {}", read(path)?) //~ no-work-in-format-args
+}
+
+fn passes(rows: &[u32], name: &str, path: &Path, error: &Error) -> Result<()> {
+    let count = rows.len();
+    let first = rows.first();
+
+    info!(target: "wyrm", %error, path = %path.display(), ?first, count, "loaded {name}");
+    debug!(block.id = rows[0], "moved {count}", count = count);
+    ensure!(rows.len() < 4, "too many: {count}");
+
+    if count > 3 {
+        panic!("bad {}", rows[0]);
+    }
+
+    bail!("{}", name)
+}

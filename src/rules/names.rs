@@ -89,7 +89,10 @@ impl Names {
     }
 
     fn numbered(&mut self, names: &[(String, usize)]) {
-        let all: HashSet<&str> = names.iter().map(|(name, _)| name.as_str()).collect();
+        let all: HashSet<&str> = names
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .collect();
         let bases: Vec<(&str, &str, usize)> = names
             .iter()
             .filter_map(|(name, line)| Some((name.as_str(), numbered_base(name)?, *line)))
@@ -200,7 +203,9 @@ impl<'ast> Visit<'ast> for Names {
 /// that carries one (`utf8`, `ipv6`, `sha256`, `base64`).
 fn numbered_base(name: &str) -> Option<&str> {
     let base = name.trim_end_matches(|character: char| character.is_ascii_digit());
-    let number = name.get(base.len()..).unwrap_or_default();
+    let number = name
+        .get(base.len()..)
+        .unwrap_or_default();
     let base = base.trim_end_matches('_');
     let word = base.rsplit('_').next().unwrap_or(base);
     let part_of_the_name = word.len() <= MAX_COORDINATE_LETTERS

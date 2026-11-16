@@ -1,0 +1,32 @@
+//! `&` around a binding: copy at the source instead.
+
+fn hits(numbers: &[u32], widths: &[u32]) -> Option<u32> {
+    let odd = numbers.iter().filter(|&number| number % 2 != 0).count(); //~ no-reference-patterns
+    let item = |&index: &usize| numbers[index]; //~ no-reference-patterns
+    let total: usize = numbers
+        .iter()
+        .enumerate()
+        .map(|(index, &number)| index + number as usize) //~ no-reference-patterns
+        .sum();
+    let &width = widths.first()?; //~ no-reference-patterns
+
+    Some(width + item(odd) + total as u32)
+}
+
+fn passes(pairs: &[(&str, &str)], numbers: &[u32], widths: &[u32]) -> usize {
+    let lengths = pairs
+        .iter()
+        .map(|&(path, text)| path.len() + text.len())
+        .count();
+    let odd = numbers
+        .iter()
+        .filter(|number| *number % 2 != 0)
+        .count();
+    let copied = numbers.iter().copied().map(|number| number + 1).count();
+
+    if let Some(&width) = widths.first() {
+        return width as usize;
+    }
+
+    lengths + odd + copied
+}

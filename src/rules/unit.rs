@@ -77,7 +77,11 @@ impl Unit {
     /// A block's statements, with its value, the last expression with no `;`, as a
     /// [`Kind::Tail`] unless it's a block or a `return` already.
     pub(super) fn of_block(block: &Block) -> Vec<Self> {
-        let mut units: Vec<Self> = block.stmts.iter().map(Self::of_stmt).collect();
+        let mut units: Vec<Self> = block
+            .stmts
+            .iter()
+            .map(Self::of_stmt)
+            .collect();
 
         if let (Some(last), Some(unit)) = (block.stmts.last(), units.last_mut())
             && is_value(last)
@@ -265,7 +269,11 @@ fn macro_kind(invocation: &Macro) -> Kind {
         .path
         .segments
         .last()
-        .is_some_and(|segment| ASSERT_MACROS.iter().any(|name| segment.ident == name));
+        .is_some_and(|segment| {
+            ASSERT_MACROS
+                .iter()
+                .any(|name| segment.ident == name)
+        });
 
     if is_assert { Kind::Assert } else { Kind::Other }
 }

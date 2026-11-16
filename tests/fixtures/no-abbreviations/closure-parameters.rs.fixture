@@ -1,0 +1,33 @@
+//! Closure parameters: a word, or a real two-letter one.
+
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+fn hits(numbers: &[i32], names: &[(String, u32)], text: &str) -> usize {
+    let odd = numbers.iter().filter(|n| *n % 2 != 0).count(); //~ no-abbreviations
+    let pairs = names.iter().map(|(k, v)| (v, k)).count(); //~ no-abbreviations, no-abbreviations
+    let letters = text.chars().filter(|ch| ch.is_alphabetic()).count(); //~ no-abbreviations
+    let doubled: Vec<i32> = (0..3).map(|i| i * 2).collect(); //~ no-abbreviations
+    let typed = numbers.iter().map(|el: &i32| el + 1).count(); //~ no-abbreviations
+
+    odd + pairs + letters + doubled.len() + typed
+}
+
+fn passes(numbers: &[i32], points: &[Point], counts: &[u32]) -> usize {
+    let odd = numbers
+        .iter()
+        .filter(|number| *number % 2 != 0)
+        .count();
+    let found = counts.iter().filter(|id| **id > 3).count();
+    let sums = points.iter().map(|Point { x, y }| x + y).count();
+    let named = points
+        .iter()
+        .map(|Point { x: across, .. }| across)
+        .count();
+    let ones = numbers.iter().map(|_| 1).count();
+    let cell = numbers.iter().map(|row| row + 1).count();
+
+    odd + found + sums + named + ones + cell
+}

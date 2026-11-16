@@ -25,7 +25,10 @@ struct HiddenCode<'run> {
 impl HiddenCode<'_> {
     /// Why code at `target` (written as `written`) is hidden, if it is.
     fn hidden(&self, target: &Path, written: &str) -> Option<String> {
-        if target.extension().is_none_or(|extension| extension != "rs") {
+        if target
+            .extension()
+            .is_none_or(|extension| extension != "rs")
+        {
             Some(format!(
                 "`{written}`, which isn't a `.rs` file, so no rule reads the code in it; make it a `.rs` module"
             ))
@@ -89,7 +92,8 @@ impl<'ast> Visit<'ast> for HiddenCode<'_> {
             }
         }
 
-        self.inline.push(module.ident.to_string());
+        self.inline
+            .push(module.ident.to_string());
         visit::visit_item_mod(self, module);
         self.inline.pop();
     }

@@ -121,17 +121,27 @@ impl Project {
     #[must_use]
     pub fn context(&self, path: &Path) -> Context<'_> {
         let absolute = normalize(&self.base.join(path));
-        let role = self.roles.get(&absolute).copied().unwrap_or_else(|| {
-            tree::crate_root(&absolute)
-                .or(Some(self.config.root.as_path()))
-                .and_then(|root| absolute.strip_prefix(root).ok())
-                .map_or(Role::Library, Role::from_path)
-        });
+        let role = self
+            .roles
+            .get(&absolute)
+            .copied()
+            .unwrap_or_else(|| {
+                tree::crate_root(&absolute)
+                    .or(Some(self.config.root.as_path()))
+                    .and_then(|root| absolute.strip_prefix(root).ok())
+                    .map_or(Role::Library, Role::from_path)
+            });
 
         let relative = path
             .canonicalize()
             .ok()
-            .and_then(|real| Some(real.strip_prefix(&self.config.root).ok()?.to_path_buf()));
+            .and_then(|real| {
+                Some(
+                    real.strip_prefix(&self.config.root)
+                        .ok()?
+                        .to_path_buf(),
+                )
+            });
 
         Context {
             config: &self.config,
@@ -230,7 +240,10 @@ fn settle_within(
 
     let findings = findings_in(source, context)?;
 
-    if findings.iter().any(|finding| finding.edit.is_some()) {
+    if findings
+        .iter()
+        .any(|finding| finding.edit.is_some())
+    {
         return Err(CheckError::FixDidNotSettle {
             path: source.path.clone(),
         });

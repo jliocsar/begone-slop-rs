@@ -87,7 +87,10 @@ impl Fixture {
             Err(cause) => return Err(cause),
         };
 
-        let code: Vec<&str> = lines.iter().map(|(code, _)| *code).collect();
+        let code: Vec<&str> = lines
+            .iter()
+            .map(|(code, _)| *code)
+            .collect();
 
         Ok(Self {
             file,
@@ -129,15 +132,25 @@ impl Fixture {
     /// What the pattern rule this fixture's directory is named after reports, as `(line, rule)`
     /// pairs. Nothing when the directory isn't a pattern rule.
     fn patterns_found(&self) -> io::Result<Vec<(usize, String)>> {
-        let Some(directory) = self.file.parent().and_then(Path::file_name) else {
+        let Some(directory) = self
+            .file
+            .parent()
+            .and_then(Path::file_name)
+        else {
             return Ok(Vec::new());
         };
 
-        let Some((_, rule)) = RULES.iter().find(|(id, _)| directory == *id) else {
+        let Some((_, rule)) = RULES
+            .iter()
+            .find(|(id, _)| directory == *id)
+        else {
             return Ok(Vec::new());
         };
 
-        let case = self.file.file_name().unwrap_or_default();
+        let case = self
+            .file
+            .file_name()
+            .unwrap_or_default();
         let root = Path::new(env!("CARGO_TARGET_TMPDIR"))
             .join("fixtures")
             .join(directory)
@@ -159,19 +172,26 @@ impl Fixture {
             command.args(["--no-ignore", ignore]);
         }
 
-        let output = command.arg("--").arg(&self.path).output()?;
+        let output = command
+            .arg("--")
+            .arg(&self.path)
+            .output()?;
 
         Ok(String::from_utf8_lossy(&output.stdout)
             .lines()
             .filter_map(|line| {
                 // `::<level> file=..,line=..,title=<rule>::<message>`
-                let (_level, rest) = line.strip_prefix("::")?.split_once(' ')?;
+                let (_level, rest) = line
+                    .strip_prefix("::")?
+                    .split_once(' ')?;
                 let fields = rest.split("::").next()?;
 
                 let field = |name: &str| {
-                    fields
-                        .split(',')
-                        .find_map(|field| field.strip_prefix(name)?.strip_prefix('='))
+                    fields.split(',').find_map(|field| {
+                        field
+                            .strip_prefix(name)?
+                            .strip_prefix('=')
+                    })
                 };
 
                 Some((field("line")?.parse().ok()?, field("title")?.to_owned()))
@@ -206,10 +226,16 @@ fn fixtures() -> io::Result<Vec<Fixture>> {
         .map(|entry| Ok(entry?.path()))
         .collect::<io::Result<Vec<PathBuf>>>()?;
 
-    files.retain(|file| file.to_string_lossy().ends_with(EXTENSION));
+    files.retain(|file| {
+        file.to_string_lossy()
+            .ends_with(EXTENSION)
+    });
     files.sort();
 
-    files.into_iter().map(Fixture::read).collect()
+    files
+        .into_iter()
+        .map(Fixture::read)
+        .collect()
 }
 
 #[test]
@@ -234,8 +260,10 @@ fn every_fixture_reports_exactly_its_marked_lines() {
         })
         .collect();
 
+    let report = wrong.join("\n");
+
     assert!(!fixtures.is_empty(), "no fixtures under tests/fixtures");
-    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+    assert!(wrong.is_empty(), "{report}");
 }
 
 #[test]
@@ -245,7 +273,9 @@ fn fixing_a_fixture_settles_and_fixing_again_changes_nothing() {
         .iter()
         .filter_map(|fixture| {
             let once = fixture.fixed(&fixture.text);
-            let twice = once.as_ref().map(|text| fixture.fixed(text));
+            let twice = once
+                .as_ref()
+                .map(|text| fixture.fixed(text));
 
             match (&once, &twice) {
                 (Ok(once), Ok(Ok(twice))) if once == twice => None,
@@ -257,5 +287,7 @@ fn fixing_a_fixture_settles_and_fixing_again_changes_nothing() {
         })
         .collect();
 
-    assert!(unsettled.is_empty(), "{}", unsettled.join("\n"));
+    let report = unsettled.join("\n");
+
+    assert!(unsettled.is_empty(), "{report}");
 }

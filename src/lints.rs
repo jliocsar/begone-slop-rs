@@ -176,7 +176,10 @@ pub fn default_level(lint: &str) -> Option<Level> {
 /// The lints in a group; empty for anything that isn't one.
 #[must_use]
 pub fn members(group: &str) -> &'static [&'static str] {
-    GROUPS.get(group).copied().unwrap_or_default()
+    GROUPS
+        .get(group)
+        .copied()
+        .unwrap_or_default()
 }
 
 /// Whether `name` is a lint group, `warnings` included.
@@ -187,7 +190,9 @@ pub fn is_group(name: &str) -> bool {
 
 /// Every lint rustc and clippy know, by full name.
 pub fn known() -> impl Iterator<Item = &'static str> {
-    known::LINTS.iter().map(|(name, _)| *name)
+    known::LINTS
+        .iter()
+        .map(|(name, _)| *name)
 }
 
 /// The current name of a lint written under an old one; any other name as it is.
@@ -208,7 +213,10 @@ pub fn entries(lints: &Table) -> (Vec<Entry>, Vec<String>) {
     let mut unreadable = Vec::new();
 
     for (tool, table) in lints {
-        let Some((_, prefix)) = TOOLS.iter().find(|(name, _)| name == tool) else {
+        let Some((_, prefix)) = TOOLS
+            .iter()
+            .find(|(name, _)| name == tool)
+        else {
             continue;
         };
 
@@ -233,9 +241,16 @@ pub fn entries(lints: &Table) -> (Vec<Entry>, Vec<String>) {
 /// Where `lint` ends up under `entries`.
 #[must_use]
 pub fn resolve<'table>(entries: &'table [Entry], lint: &str) -> Resolved<'table> {
-    let covering = || entries.iter().filter(|entry| entry.covers(lint));
+    let covering = || {
+        entries
+            .iter()
+            .filter(|entry| entry.covers(lint))
+    };
 
-    let Some(top) = covering().map(|entry| entry.priority).max() else {
+    let Some(top) = covering()
+        .map(|entry| entry.priority)
+        .max()
+    else {
         return Resolved {
             level: default_level(lint),
             by: None,

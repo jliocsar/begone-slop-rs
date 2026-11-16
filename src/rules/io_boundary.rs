@@ -168,7 +168,10 @@ impl<'ast> Visit<'ast> for IoCheck<'_> {
 
     fn visit_path(&mut self, path: &'ast syn::Path) {
         let written = segments(path);
-        let first = written.first().cloned().unwrap_or_default();
+        let first = written
+            .first()
+            .cloned()
+            .unwrap_or_default();
 
         // An import that is an effect was reported at the `use`; only a path that reaches
         // further through a harmless import (`io::stdout()` after `use std::io`) is new here.
@@ -211,12 +214,19 @@ fn fetches_kind(receiver: &Expr) -> bool {
         Expr::Try(inner) => fetches_kind(&inner.expr),
         Expr::Paren(inner) => fetches_kind(&inner.expr),
         Expr::Reference(inner) => fetches_kind(&inner.expr),
-        Expr::MethodCall(call) => KIND_SOURCES.iter().any(|name| call.method == name),
-        Expr::Path(binding) => binding.path.get_ident().is_some_and(|name| {
-            let name = name.to_string();
+        Expr::MethodCall(call) => KIND_SOURCES
+            .iter()
+            .any(|name| call.method == name),
+        Expr::Path(binding) => binding
+            .path
+            .get_ident()
+            .is_some_and(|name| {
+                let name = name.to_string();
 
-            KIND_NAMES.iter().any(|kind| name.contains(kind))
-        }),
+                KIND_NAMES
+                    .iter()
+                    .any(|kind| name.contains(kind))
+            }),
         _ => false,
     }
 }
@@ -246,7 +256,9 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     };
 
     io_check.visit_file(file.syntax);
-    io_check.findings.dedup_by_key(|finding| finding.line);
+    io_check
+        .findings
+        .dedup_by_key(|finding| finding.line);
 
     io_check.findings
 }

@@ -59,7 +59,12 @@ impl<'ast> Visit<'ast> for Padding<'_> {
     }
 
     fn visit_item_impl(&mut self, implementation: &'ast ItemImpl) {
-        self.sequence(implementation.items.iter().map(Unit::of_impl_item));
+        self.sequence(
+            implementation
+                .items
+                .iter()
+                .map(Unit::of_impl_item),
+        );
         visit::visit_item_impl(self, implementation);
     }
 
@@ -80,7 +85,12 @@ impl<'ast> Visit<'ast> for Padding<'_> {
     }
 
     fn visit_item_trait(&mut self, definition: &'ast ItemTrait) {
-        self.sequence(definition.items.iter().map(Unit::of_trait_item));
+        self.sequence(
+            definition
+                .items
+                .iter()
+                .map(Unit::of_trait_item),
+        );
         visit::visit_item_trait(self, definition);
     }
 

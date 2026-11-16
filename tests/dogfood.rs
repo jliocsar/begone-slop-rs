@@ -21,11 +21,16 @@ fn this_repo_passes_its_own_rules() {
         .flat_map(|path| {
             let report = check::check_file(path, Mode::Report, &project).unwrap();
 
-            report.findings.into_iter().map(move |finding| {
-                format!("{}:{}: {}", path.display(), finding.line, finding.message)
-            })
+            report
+                .findings
+                .into_iter()
+                .map(move |finding| {
+                    format!("{}:{}: {}", path.display(), finding.line, finding.message)
+                })
         })
         .collect();
 
-    assert!(problems.is_empty(), "{}", problems.join("\n"));
+    let report = problems.join("\n");
+
+    assert!(problems.is_empty(), "{report}");
 }

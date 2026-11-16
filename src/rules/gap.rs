@@ -26,7 +26,8 @@ impl Gap {
     /// A comment in the gap introduces what follows it, so a blank line around it is the
     /// author's call.
     fn has_comment(self, source: &Source) -> bool {
-        self.lines().any(|number| !source.is_blank(number))
+        self.lines()
+            .any(|number| !source.is_blank(number))
     }
 }
 

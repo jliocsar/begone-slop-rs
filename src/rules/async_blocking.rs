@@ -66,7 +66,9 @@ impl<'ast> Visit<'ast> for AsyncBlocking<'_> {
 
     fn visit_expr_call(&mut self, call: &'ast ExprCall) {
         let callee = match &*call.func {
-            Expr::Path(path) => segments(&path.path).pop().unwrap_or_default(),
+            Expr::Path(path) => segments(&path.path)
+                .pop()
+                .unwrap_or_default(),
             _ => String::new(),
         };
 
@@ -150,7 +152,9 @@ pub(super) fn check(file: &FileContext) -> Vec<Finding> {
     };
 
     check.visit_file(file.syntax);
-    check.findings.dedup_by_key(|finding| finding.line);
+    check
+        .findings
+        .dedup_by_key(|finding| finding.line);
 
     check.findings
 }
