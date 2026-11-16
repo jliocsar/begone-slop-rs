@@ -1,0 +1,25 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+      # The toolchain src/lints/known.rs was generated from (`scripts/lint-table`), so the
+      # preset-drift rule knows every lint clippy does. Bump the two together.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.1
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: ast-grep@0.45.3
+      # fmt, clippy, tests, `cargo bs` on this tree (the alias in .cargo/config.toml runs the
+      # tool built from it), and the ast-grep rule tests.
+      - run: scripts/check
