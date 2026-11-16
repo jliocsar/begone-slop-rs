@@ -152,7 +152,9 @@ impl Setting<'_> {
                 let wanted = self.preset?;
 
                 (self.project.is_some_and(|have| have != wanted)).then(|| {
-                    format!("`{key}` must stay {}, as the preset sets it", self.shown(Some(wanted)))
+                    let preset_shown = self.shown(Some(wanted));
+
+                    format!("`{key}` must stay {preset_shown}, as the preset sets it")
                 })
             }
             Direction::NotHere => self.project.map(|_| format!("`{key}` in clippy.toml turns off every lint newer than it; set `rust-version` in Cargo.toml instead")),
@@ -178,11 +180,12 @@ impl Setting<'_> {
         };
 
         looser.then(|| {
+            let project_shown = self.shown(self.project);
+            let preset_shown = self.shown(self.preset);
+
             format!(
-                "`{}` is {} here; the preset allows {bound} {}",
-                self.key,
-                self.shown(self.project),
-                self.shown(self.preset)
+                "`{}` is {project_shown} here; the preset allows {bound} {preset_shown}",
+                self.key
             )
         })
     }
@@ -205,11 +208,12 @@ impl Setting<'_> {
         };
 
         looser.then(|| {
+            let project_shown = self.shown(self.project);
+            let preset_shown = self.shown(self.preset);
+
             format!(
-                "`{}` is {} here; the preset has {}",
-                self.key,
-                self.shown(self.project),
-                self.shown(self.preset)
+                "`{}` is {project_shown} here; the preset has {preset_shown}",
+                self.key
             )
         })
     }
@@ -228,11 +232,12 @@ impl Setting<'_> {
                 .collect();
 
             (!extra.is_empty()).then(|| {
+                let extra_shown = quoted(&extra);
+                let preset_shown = self.shown(self.preset);
+
                 format!(
-                    "`{}` exempts {} on top of the preset's {}; it may only drop entries",
-                    self.key,
-                    quoted(&extra),
-                    self.shown(self.preset)
+                    "`{}` exempts {extra_shown} on top of the preset's {preset_shown}; it may only drop entries",
+                    self.key
                 )
             })
         } else {
@@ -242,10 +247,11 @@ impl Setting<'_> {
                 .collect();
 
             (!dropped.is_empty()).then(|| {
+                let dropped_shown = quoted(&dropped);
+
                 format!(
-                    "`{}` drops {} from the preset's bans; it may only add entries",
-                    self.key,
-                    quoted(&dropped)
+                    "`{}` drops {dropped_shown} from the preset's bans; it may only add entries",
+                    self.key
                 )
             })
         }

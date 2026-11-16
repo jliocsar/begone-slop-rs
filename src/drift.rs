@@ -75,7 +75,9 @@ impl fmt::Display for Drift {
             write!(formatter, ":{line}")?;
         }
 
-        write!(formatter, ": {}: {}", self.gate.name(), self.message)
+        let gate = self.gate.name();
+
+        write!(formatter, ": {gate}: {}", self.message)
     }
 }
 
@@ -95,9 +97,10 @@ impl Document {
             ))
         })?;
         let table = text.parse::<Table>().map_err(|cause| {
+            let reason = cause.message();
+
             unreadable(format!(
-                "isn't valid TOML ({}), so the gate can't be checked",
-                cause.message()
+                "isn't valid TOML ({reason}), so the gate can't be checked"
             ))
         })?;
 
@@ -321,38 +324,33 @@ fn turned_down<'table>(
 }
 
 fn lowered_message(entry: Option<&Entry>, lowered: &[Lowered]) -> String {
+    let names = listed(lowered);
+
     let (Some(first), Some(entry)) = (lowered.first(), entry) else {
         return format!(
-            "the lints table doesn't turn on {} the way the preset does; `cargo bs init` prints the preset",
-            listed(lowered)
+            "the lints table doesn't turn on {names} the way the preset does; `cargo bs init` prints the preset"
         );
     };
 
-    if lowered.len() > 1 {
+    let count = lowered.len();
+    let level = entry.level.name();
+    let have = shown(first.have);
+    let wanted = first.wanted.name();
+
+    if count > 1 {
         format!(
-            "`{}` = \"{}\" (priority {}) turns down {} lints the preset turns on: {}",
-            entry.name,
-            entry.level.name(),
-            entry.priority,
-            lowered.len(),
-            listed(lowered)
+            "`{}` = \"{level}\" (priority {}) turns down {count} lints the preset turns on: {names}",
+            entry.name, entry.priority
         )
     } else if entry.name == first.lint {
         format!(
-            "`{}` = \"{}\" turns down a lint the preset has at `{}`",
-            first.lint,
-            shown(first.have),
-            first.wanted.name()
+            "`{}` = \"{have}\" turns down a lint the preset has at `{wanted}`",
+            first.lint
         )
     } else {
         format!(
-            "`{}` ends up `{}` here, through `{}` = \"{}\" (priority {}); the preset has it at `{}`",
-            first.lint,
-            shown(first.have),
-            entry.name,
-            entry.level.name(),
-            entry.priority,
-            first.wanted.name()
+            "`{}` ends up `{have}` here, through `{}` = \"{level}\" (priority {}); the preset has it at `{wanted}`",
+            first.lint, entry.name, entry.priority
         )
     }
 }
@@ -375,7 +373,9 @@ fn listed(lowered: &[Lowered]) -> String {
         .collect();
 
     if lowered.len() > NAMES_SHOWN {
-        names.push(format!("and {} more", lowered.len() - NAMES_SHOWN));
+        let hidden = lowered.len() - NAMES_SHOWN;
+
+        names.push(format!("and {hidden} more"));
     }
 
     names.join(", ")
@@ -513,8 +513,8 @@ mod tests {
     /// A scratch project outside any git checkout, unique per run so parallel runs don't
     /// share it.
     fn project(case: &str, files: &[(&str, &str)]) -> PathBuf {
-        let directory =
-            std::env::temp_dir().join(format!("cargo-bs-drift-{case}-{}", std::process::id()));
+        let run = std::process::id();
+        let directory = std::env::temp_dir().join(format!("cargo-bs-drift-{case}-{run}"));
         let _ignored = fs::remove_dir_all(&directory);
 
         for (name, text) in files {

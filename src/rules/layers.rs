@@ -86,13 +86,14 @@ impl LayerCheck<'_> {
                 .collect::<Vec<_>>()
                 .join(" → ");
 
+            let module = self.module.join("::");
+            let imported = target.join("::");
+
             self.findings.push(Finding {
                 line,
                 rule: Rule::Layers,
                 message: format!(
-                    "`{}` imports `{}` from a layer above its own; dependencies point down ({order})",
-                    self.module.join("::"),
-                    target.join("::")
+                    "`{module}` imports `{imported}` from a layer above its own; dependencies point down ({order})"
                 ),
                 edit: None,
             });
