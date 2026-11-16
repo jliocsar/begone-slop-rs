@@ -331,6 +331,9 @@ changes nothing. The `.rs.fixture` extension keeps the gate, which lints every `
 lists, off the slop they hold on purpose. To turn a repro into a regression test, drop it in and
 mark its lines.
 
+CI runs `scripts/check` on every push to main and every pull request, on the toolchain
+`src/lints/known.rs` was generated from.
+
 ```sh
 git config core.hooksPath .githooks   # the gate on every commit
 scripts/check                         # fmt, clippy, tests, cargo bs, ast-grep tests
