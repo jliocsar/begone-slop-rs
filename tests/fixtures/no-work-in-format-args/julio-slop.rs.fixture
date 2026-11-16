@@ -2,7 +2,7 @@
 //! julio's slop example: what the syntax rules catch in it.
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> { //~ no-needless-main-result
-    let _x = |&y: &i32| -> bool { //~ no-abbreviations, no-abbreviations
+    let _x = |&y: &i32| -> bool { //~ no-abbreviations, no-abbreviations, no-reference-patterns
         y & 0b1010_1010u8 as i32 ^ !0xFFu32 >> 1 //~ parenthesize-mixed-operators
             == 0 && *(&y) <= 42 || y % 3 != 0
     };

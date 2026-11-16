@@ -219,6 +219,7 @@ The Effect rules have no Rust counterpart. `no-switch` doesn't port, since `matc
 | `no-work-in-format-args` | a method call, function call, closure, operator, cast or block as an argument of `println!`, `format!`, `write!` and friends, `panic!`, `anyhow!`, `bail!`, an assertion's message (not what it checks), or a `tracing`/`log` macro's fields and message (`count = rows.len()`, `%error.kind()`); literals, names, fields, references, indexes, ranges, constructors and macros pass |  —  |
 | `no-needless-main-result` | `fn main() -> Result<..>` whose only way out is the `Ok(())` at its end (a `?` in a closure doesn't count) |  —  |
 | `parenthesize-mixed-operators` | a bitwise operator or shift with another operator under it (`y * y ^ 0xff`), a comparison with one under it (`y & 1 == 0`), or `&&` under `\|\|` (`a && b \|\| c`); one operator repeated, and arithmetic under a comparison, pass |  —  |
+| `no-reference-patterns` | `&` around a binding in a closure parameter or `let` (`\|&n\|`, `\|(index, &value)\|`, `let &x = ..`): use `.copied()` or `*`; a destructuring `&(a, b)` passes |  —  |
 | `no-cfg-test-in-prod`  | in shipped code, `cfg!(test)`, `#[cfg(test)]` inside a function body, and `*_for_test(s)`/`*_for_testing`/`test_only_*` functions outside `#[cfg(test)]` |  —  |
 
 Test code, which several rules exempt or only check, is a `#[test]` function, a `#[cfg(test)]`

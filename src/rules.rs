@@ -24,6 +24,7 @@ mod panic_bypass;
 mod paths;
 mod prefer_match;
 mod reexport_only;
+mod reference_patterns;
 mod signatures;
 mod silent_errors;
 mod test_honesty;
@@ -72,7 +73,7 @@ macro_rules! rules {
 
 /// Every check the syntax engine runs, in order. Each reads one file and returns what it
 /// found, for one rule or several.
-const CHECKS: [fn(&FileContext) -> Vec<Finding>; 27] = [
+const CHECKS: [fn(&FileContext) -> Vec<Finding>; 28] = [
     padding::check,
     assert_padding::check,
     complexity::check,
@@ -100,6 +101,7 @@ const CHECKS: [fn(&FileContext) -> Vec<Finding>; 27] = [
     format_args::check,
     main_result::check,
     operators::check,
+    reference_patterns::check,
 ];
 
 rules! {
@@ -125,6 +127,7 @@ rules! {
     NoNeedlessMainResult => "no-needless-main-result", Syntax, false;
     NoNumberedNames => "no-numbered-names", Syntax, false;
     NoPanicBypass => "no-panic-bypass", Syntax, false;
+    NoReferencePatterns => "no-reference-patterns", Syntax, false;
     NoSilentErrorArm => "no-silent-err-arm", Syntax, false;
     NoSleepInTests => "no-sleep-in-tests", Syntax, false;
     NoStringlyFields => "no-stringly-fields", Syntax, false;
