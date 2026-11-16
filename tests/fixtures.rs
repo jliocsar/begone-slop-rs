@@ -260,8 +260,10 @@ fn every_fixture_reports_exactly_its_marked_lines() {
         })
         .collect();
 
+    let report = wrong.join("\n");
+
     assert!(!fixtures.is_empty(), "no fixtures under tests/fixtures");
-    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+    assert!(wrong.is_empty(), "{report}");
 }
 
 #[test]
@@ -285,5 +287,7 @@ fn fixing_a_fixture_settles_and_fixing_again_changes_nothing() {
         })
         .collect();
 
-    assert!(unsettled.is_empty(), "{}", unsettled.join("\n"));
+    let report = unsettled.join("\n");
+
+    assert!(unsettled.is_empty(), "{report}");
 }

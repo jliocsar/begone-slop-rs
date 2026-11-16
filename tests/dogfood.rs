@@ -30,5 +30,7 @@ fn this_repo_passes_its_own_rules() {
         })
         .collect();
 
-    assert!(problems.is_empty(), "{}", problems.join("\n"));
+    let report = problems.join("\n");
+
+    assert!(problems.is_empty(), "{report}");
 }

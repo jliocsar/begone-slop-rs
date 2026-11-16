@@ -238,7 +238,7 @@ impl Config {
         let io = self.io.iter();
         let allowed = io
             .clone()
-            .flat_map(|io| &io.allowed)
+            .flat_map(|section| &section.allowed)
             .find_map(|allowed| {
                 (!self.root.join(allowed).exists()).then(|| {
                     (
@@ -248,7 +248,7 @@ impl Config {
                 })
             });
         let effects = io
-            .flat_map(|io| &io.effects)
+            .flat_map(|section| &section.effects)
             .find_map(|effect| {
                 (!effect.split("::").all(is_identifier)).then(|| {
                     (

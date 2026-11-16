@@ -4,8 +4,9 @@
 //! knows that `&` binds tighter than `^`, which binds tighter than `==`, can tell. Where a
 //! bitwise operator (`&`, `|`, `^`) or a shift (`<<`, `>>`) has another operator under it, or a
 //! comparison has a bitwise operator or a shift under it, the inner one goes in parentheses.
-//! Arithmetic under a comparison (`value % 3 != 0`) reads fine and passes, and so does one
-//! operator repeated (`a & b & c`).
+//! An `&&` directly under an `||` goes in parentheses too: `a && b || c` is `(a && b) || c`,
+//! so write that. Arithmetic under a comparison (`value % 3 != 0`), a comparison under `&&` or
+//! `||`, and one operator repeated (`a & b & c`, `a || b || c`) read fine and pass.
 
 use std::mem;
 
@@ -65,6 +66,9 @@ fn needs_parentheses(outer: &BinOp, inner: &BinOp) -> bool {
             !repeated
         }
         (Family::Comparison, Family::Bitwise | Family::Shift) => true,
+        (Family::Logical, Family::Logical) => {
+            matches!((outer, inner), (BinOp::Or(_), BinOp::And(_)))
+        }
         _ => false,
     }
 }
@@ -135,6 +139,20 @@ mod tests {
     #[test]
     fn parenthesized_repeated_and_arithmetic_comparisons_pass() {
         let text = "fn odd(value: i32) -> bool {\n    let low = (value * value) ^ 0xff;\n    let all = value & MASK & 0xff;\n    let bits = (!0xff_u32 >> 1) as i32;\n\n    (low == bits && value <= 42) || value % 3 != 0\n}\n";
+
+        assert_eq!(lines_of(Rule::ParenthesizeMixedOperators, text), NONE);
+    }
+
+    #[test]
+    fn and_directly_under_or_is_reported() {
+        let text = "fn keep(left: bool, right: bool, other: bool) -> bool {\n    let first = left && right || other;\n    let second = other || left && right;\n    let third = left\n        && right\n        || other;\n\n    first && second && third\n}\n";
+
+        assert_eq!(lines_of(Rule::ParenthesizeMixedOperators, text), [2, 3, 4]);
+    }
+
+    #[test]
+    fn parenthesized_or_repeated_logic_passes() {
+        let text = "fn keep(left: bool, right: bool, other: bool) -> bool {\n    let first = (left && right) || other;\n    let second = left && (right || other);\n    let third = left || right || other;\n\n    first && second && third && left == right\n}\n";
 
         assert_eq!(lines_of(Rule::ParenthesizeMixedOperators, text), NONE);
     }

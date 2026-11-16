@@ -2,11 +2,11 @@
 //! julio's slop example: what the syntax rules catch in it.
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> { //~ no-needless-main-result
-    let _x = |&y: &i32| -> bool { //~ no-abbreviations
+    let _x = |&y: &i32| -> bool { //~ no-abbreviations, no-abbreviations
         y & 0b1010_1010u8 as i32 ^ !0xFFu32 >> 1 //~ parenthesize-mixed-operators
             == 0 && *(&y) <= 42 || y % 3 != 0
     };
-    let _f = |z: &_| { //~ no-abbreviations, padding
+    let _f = |z: &_| { //~ no-abbreviations, no-abbreviations, padding
         **(&&z) * *(&*z) ^ *(&0xFF_u8) as i32 //~ parenthesize-mixed-operators
     };
     println!(r#"$#@! {} {:?} {:?}"#, //~ padding

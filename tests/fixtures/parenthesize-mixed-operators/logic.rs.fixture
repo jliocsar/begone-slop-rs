@@ -1,0 +1,21 @@
+//! `&&` under `||`: parenthesize it.
+
+fn hits() -> bool {
+    let (left, right, other) = flags();
+    let first = left && right || other; //~ parenthesize-mixed-operators
+    let second = other || left && right; //~ parenthesize-mixed-operators
+    let third = left //~ parenthesize-mixed-operators
+        && right
+        || other;
+
+    first && second && third
+}
+
+fn passes(value: i32) -> bool {
+    let (left, right, other) = flags();
+    let first = (left && right) || other;
+    let second = left && (right || other);
+    let third = left || right || other;
+
+    (first == second && value <= 42) || value % 3 != 0 || third
+}

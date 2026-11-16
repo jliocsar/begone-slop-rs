@@ -1,0 +1,17 @@
+//@ path: tests/sample.rs
+//! An assertion's condition may compute; its message may not.
+
+#[test]
+fn a_message_prints_names() {
+    let rows = load();
+    let text = "wyrm ";
+
+    assert!(rows.is_empty(), "left over: {}", rows.len()); //~ no-work-in-format-args
+    assert_eq!("wyrm", text.trim());
+    assert_ne!(parse(text), None, "{}", text.trim()); //~ no-work-in-format-args
+    assert!(rows.is_empty(), "{}", format!("{}", rows.len())); //~ no-work-in-format-args
+
+    let report = rows.len();
+
+    assert!(rows.is_empty(), "left over: {report}");
+}
