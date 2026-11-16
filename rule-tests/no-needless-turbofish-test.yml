@@ -3,8 +3,12 @@ valid:
   - 'fn total(numbers: &[i32]) -> i32 { let total: i32 = numbers.iter().sum(); total }'
   - 'fn total(numbers: &[i32]) -> i32 { let total = numbers.iter().sum::<i32>(); total }'
   - 'fn names(text: &str) -> Vec<String> { let names: Vec<String> = text.lines().map(str::to_owned).collect(); names }'
+  - 'fn names(lines: &[&str]) -> Result<BTreeSet<String>, Error> { let names: BTreeSet<String> = lines.iter().map(parse).collect::<Result<_, _>>()?; Ok(names) }'
+  - 'fn size() -> usize { let size: usize = mem::size_of::<Header>(); size }'
+  - 'fn entries(directory: &Path) -> io::Result<Vec<DirEntry>> { let mut entries: Vec<DirEntry> = fs::read_dir(directory)?.collect::<io::Result<_>>()?; entries.sort(); Ok(entries) }'
 invalid:
   - 'fn total(numbers: &[i32]) -> i32 { let total: i32 = numbers.iter().sum::<i32>(); total }'
-  - 'fn names(text: &str) -> Vec<&str> { let names: Vec<&str> = text.lines().collect::<Vec<_>>(); names }'
+  - 'fn total(numbers: &[i32]) -> i32 { let mut total: i32 = numbers.iter().sum::<i32>(); total += 1; total }'
+  - 'fn names(text: &str) -> Vec<&str> { let names: Vec<&str> = text.lines().collect::<Vec<&str>>(); names }'
   - 'fn port(text: &str) -> Result<u16, ParseIntError> { let port: u16 = text.parse::<u16>()?; Ok(port) }'
   - 'fn config(text: &str) -> Config { let config: Config = parse::<Config>(text); config }'

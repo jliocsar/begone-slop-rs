@@ -4,23 +4,16 @@ severity: error
 message: The `let` already names the type, so the turbofish says it a second time.
 note: |
   `let total: i32 = numbers.iter().sum::<i32>();` reads as `let total: i32 = numbers.iter().sum();`.
-  Keep one of the two: the type on the `let`, or the turbofish without it.
+  Keep one of the two: the type on the `let`, or the turbofish without it. Only a turbofish that
+  repeats the `let`'s type is flagged: `collect::<Result<_, _>>()?` and `size_of::<T>()` say
+  something the `let` doesn't.
 rule:
-  kind: let_declaration
-  all:
-    - has:
-        field: type
-        regex: '.'
-    - has:
-        field: value
-        any:
-          - kind: call_expression
-            has:
-              field: function
-              kind: generic_function
-          - kind: try_expression
-            has:
-              kind: call_expression
-              has:
-                field: function
-                kind: generic_function
+  any:
+    - pattern: 'let $NAME: $TYPE = $VALUE.$METHOD::<$TYPE>($$$ARGUMENTS);'
+    - pattern: 'let mut $NAME: $TYPE = $VALUE.$METHOD::<$TYPE>($$$ARGUMENTS);'
+    - pattern: 'let $NAME: $TYPE = $VALUE.$METHOD::<$TYPE>($$$ARGUMENTS)?;'
+    - pattern: 'let mut $NAME: $TYPE = $VALUE.$METHOD::<$TYPE>($$$ARGUMENTS)?;'
+    - pattern: 'let $NAME: $TYPE = $FUNCTION::<$TYPE>($$$ARGUMENTS);'
+    - pattern: 'let mut $NAME: $TYPE = $FUNCTION::<$TYPE>($$$ARGUMENTS);'
+    - pattern: 'let $NAME: $TYPE = $FUNCTION::<$TYPE>($$$ARGUMENTS)?;'
+    - pattern: 'let mut $NAME: $TYPE = $FUNCTION::<$TYPE>($$$ARGUMENTS)?;'

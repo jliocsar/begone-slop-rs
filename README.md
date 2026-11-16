@@ -311,7 +311,7 @@ fn key_name(key: Key) -> &'static str {
 | `no-detached-tasks`    | `tokio::spawn(..)` / `thread::spawn(..)` with the handle dropped |
 | `error-message-style`  | `#[error("Capitalised.")]`: lowercase, no trailing period (C-GOOD-ERR) |
 | `no-rc-refcell`        | `Rc<RefCell<_>>` and `Rc<Cell<_>>`: give the state one owner      |
-| `no-needless-turbofish` | `let total: i32 = xs.iter().sum::<i32>()`: the type is written twice |
+| `no-needless-turbofish` | `let total: i32 = xs.iter().sum::<i32>()`: a turbofish that repeats the `let`'s type |
 
 A bare `#[ignore]` is clippy's `ignore_without_reason`, which the preset turns on with the
 pedantic group. Waive a pattern rule with ast-grep's own comment, on its own line above the code:
