@@ -14,7 +14,7 @@ jobs:
       # preset-drift rule knows every lint clippy does. Bump the two together.
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.99.1
+          toolchain: 1.100.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2

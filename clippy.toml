@@ -25,4 +25,6 @@ module-item-order-groupings = [
     ["constants", ["static", "const"]],
     ["types", ["ty_alias", "enum", "struct", "union", "trait", "trait_alias", "impl"]],
     ["functions", ["fn"]],
+    # Clippy 1.100 wants every item kind in a group; test binders go last.
+    ["tests", ["test_binder_constraints"]],
 ]
